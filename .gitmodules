@@ -1,0 +1,3 @@
+[submodule "Mesen-GDB"]
+	path = Mesen-GDB
+	url = https://github.com/BubbleZapGames/Mesen-GDB
