@@ -2,7 +2,7 @@
 
 ## Context
 
-XRetroCode enables real-time source-level debugging of retro console games through VSCode. Phase 1 delivers a minimal end-to-end debugging experience: launch an NES ROM from VSCode, see the game running in an SDL window with audio, break on entry, inspect CPU registers and flags, continue execution, and disconnect.
+XRetroCode enables real-time source-level debugging of retro console games through VSCode. Phase 1 delivers a minimal end-to-end debugging experience: launch an SNES ROM from VSCode, see the game running in an SDL window with audio, break on entry, inspect CPU registers and flags, continue execution, and disconnect.
 
 The `mesen-dap` binary is a standalone C++ executable with **full SDL window and audio** (not headless). The user sees the game running while debugging from VSCode.
 
@@ -67,8 +67,8 @@ All paths relative to `Mesen-GDB/` for C++ files, repo root for extension.
 **`Core/Debugger/DAP/CpuStateSerializer.h`** + **`.cpp`** (~120 lines total)
 - `static JsonValue SerializeRegisters(CpuType, BaseState&)` — returns JSON array of `{name, value, type}` Variable objects
 - `static JsonValue SerializeFlags(CpuType, BaseState&)` — individual flag variables
-- Phase 1: NES only. Cast to `NesCpuState`, emit A/X/Y/SP/PC/P (hex-formatted) + individual N/V/D/I/Z/C flag booleans
-- Uses `PSFlags` enum from `Core/NES/NesTypes.h` for bit extraction
+- Phase 1: SNES only. Cast to `SnesCpuState`, emit A/X/Y/SP/PC/P (hex-formatted) + individual N/V/D/I/Z/C flag booleans
+- Uses `PSFlags` enum from `Core/SNES/SnesTypes.h` for bit extraction
 
 **`Core/Debugger/DAP/DapNotificationListener.h`** (~25 lines, header-only declaration)
 - Implements `INotificationListener`
@@ -91,7 +91,7 @@ Handler details:
 - **`HandleInitialize`**: Respond with capabilities (`supportsConfigurationDoneRequest: true`), send `initialized` event
 - **`HandleLaunch`**: Extract `romPath`/`stopOnEntry` from args. Set `EmulationFlags::ConsoleMode`. Call `_emu->LoadRom()`. Enable debugger flags via `SetDebuggerFlag()` for each active `CpuType`. If `stopOnEntry`: call `debugger->Step(mainCpu, 1, StepType::Step)` to break on first instruction
 - **`HandleConfigurationDone`**: Mark ready, respond success
-- **`HandleThreads`**: `_emu->GetCpuTypes()` → map each to `{id: (int)cpu+1, name: "NES CPU"}`
+- **`HandleThreads`**: `_emu->GetCpuTypes()` → map each to `{id: (int)cpu+1, name: "SNES CPU"}`
 - **`HandleStackTrace`**: Map threadId→CpuType, get PC via `debugger->GetProgramCounter(cpu, true)`, return single frame `{id:1, name:"0xNNNN", line:0, column:0}`
 - **`HandleScopes`**: Return two scopes: "Registers" and "Flags" with encoded `variablesReference = (frameId << 16) | scopeType`
 - **`HandleVariables`**: Decode variablesReference, get CPU state via `DebuggerRequest` + `GetCpuState()`, call `CpuStateSerializer::SerializeRegisters/SerializeFlags`
@@ -104,7 +104,7 @@ Key Mesen break/resume flow:
 2. Our `DapNotificationListener` receives `CodeBreak` on emulation thread → sends DAP `stopped` event via `DapMessageWriter`
 3. DAP main thread reads `continue` request → calls `Debugger::Run()` which sets `_waitForBreakResume = false` → emulation thread wakes up
 
-Critical: Must call `_emu->GetSettings()->SetDebuggerFlag(DebuggerFlags::NesDebuggerEnabled, true)` after ROM load. Without this, `Debugger::IsDebugWindowOpened()` returns false and `BreakImmediately()` / step-to-break silently does nothing. (See `Debugger.cpp:777-793`, `SettingTypes.h:1085-1100`)
+Critical: Must call `_emu->GetSettings()->SetDebuggerFlag(DebuggerFlags::SnesDebuggerEnabled, true)` after ROM load. Without this, `Debugger::IsDebugWindowOpened()` returns false and `BreakImmediately()` / step-to-break silently does nothing. (See `Debugger.cpp:777-793`, `SettingTypes.h:1085-1100`)
 
 **`Core/Debugger/DAP/DapRenderer.h`** + **`.cpp`** (~160 lines total)
 - Implements `IRenderingDevice` — same interface as `Sdl/SdlRenderer.h`
@@ -153,7 +153,7 @@ dap: $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ) $(SDLOBJ) $(LIBEVDEVOBJ) $(L
 **`xretrocode-debug/package.json`** (~80 lines)
 - `contributes.debuggers`: type `"xretrocode"`, label `"XRetroCode"`
 - `configurationAttributes.launch`: `romPath` (required string), `stopOnEntry` (bool, default true), `mesenDapPath` (optional string)
-- `initialConfigurations` + `configurationSnippets` for NES ROM
+- `initialConfigurations` + `configurationSnippets` for SNES ROM
 - `contributes.configuration`: `xretrocode.mesenDapPath` setting
 - devDependencies: `@types/vscode`, `typescript`
 
@@ -207,8 +207,8 @@ dap: $(SEVENZIPOBJ) $(LUAOBJ) $(UTILOBJ) $(COREOBJ) $(SDLOBJ) $(LIBEVDEVOBJ) $(L
 - `Core/Debugger/Debugger.cpp:777-796` — `IsDebugWindowOpened()`: checks `DebuggerFlags` per CpuType
 - `Core/Shared/Emulator.cpp:362-541` — `LoadRom()`: spawns emulation thread, auto-inits debugger with `ConsoleMode` flag
 - `Core/Shared/SettingTypes.h:1085-1100` — `DebuggerFlags` enum (one flag per CpuType)
-- `Core/NES/NesTypes.h` — `NesCpuState` struct (PC, SP, A, X, Y, PS, CycleCount)
-- `Core/Shared/CpuType.h` — `CpuType` enum (Nes=8, etc.)
+- `Core/SNES/SnesCpuTypes.h` — `SnesCpuState` struct (PC, SP, A, X, Y, PS, CycleCount)
+- `Core/Shared/CpuType.h` — `CpuType` enum (Snes=1, etc.)
 - `InteropDLL/EmuApiWrapper.cpp:80-126` — Reference for SDL/renderer/sound initialization sequence
 - `Sdl/SdlRenderer.cpp` — Reference for `IRenderingDevice` implementation
 
