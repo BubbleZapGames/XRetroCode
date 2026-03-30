@@ -1,0 +1,98 @@
+{
+  "name": "xretrocode-debug",
+  "displayName": "XRetroCode Debug",
+  "description": "VSCode DAP Debug Adapter for Mesen-GDB",
+  "version": "0.0.1",
+  "publisher": "XRetroCode",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "activationEvents": [
+    "debug: xretrocode"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "debuggers": [
+      {
+        "type": "xretrocode",
+        "label": "XRetroCode",
+        "program": "./mesen-dap",
+        "runtime": "node",
+        "variables": {},
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "romPath"
+            ],
+            "properties": {
+              "romPath": {
+                "type": "string",
+                "description": "Path to the ROM file",
+                "default": ""
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop on entry point",
+                "default": true
+              },
+              "mesenDapPath": {
+                "type": "string",
+                "description": "Path to mesen-dap executable",
+                "default": ""
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "name": "Launch SNES ROM",
+            "type": "xretrocode",
+            "request": "launch",
+            "romPath": "",
+            "stopOnEntry": true
+          }
+        ]
+      }
+    ],
+    "configurationSnippets": [
+      {
+        "label": "XRetroCode: Launch SNES ROM",
+        "description": "Launch and debug a SNES ROM",
+        "body": {
+          "name": "Launch SNES ROM",
+          "type": "xretrocode",
+          "request": "launch",
+          "romPath": "${relativeFile}",
+          "stopOnEntry": true
+        }
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "XRetroCode configuration",
+      "properties": {
+        "xretrocode.mesenDapPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to mesen-dap executable"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "mocha --require out/test/setup.js 'out/test/**/*.test.js'"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.70.0",
+    "mocha": "^11.7.5",
+    "typescript": "^4.9.0"
+  }
+}
