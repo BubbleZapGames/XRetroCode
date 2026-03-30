@@ -1,0 +1,353 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "R65",
+  "scopeName": "source.r65",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#attributes" },
+    { "include": "#numbers" },
+    { "include": "#function-definition" },
+    { "include": "#type-definition" },
+    { "include": "#macro-definition" },
+    { "include": "#include-invocation" },
+    { "include": "#asm-invocation" },
+    { "include": "#macro-invocation" },
+    { "include": "#keywords-control" },
+    { "include": "#keywords-declaration" },
+    { "include": "#keywords-reserved" },
+    { "include": "#types" },
+    { "include": "#booleans" },
+    { "include": "#registers" },
+    { "include": "#labels" },
+    { "include": "#macro-variables" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.r65",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.r65",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.r65",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.r65",
+              "match": "\\\\(?:[\"\\\\nrt0]|x[0-9a-fA-F]{2}|u\\{[0-9a-fA-F]+\\})"
+            }
+          ]
+        }
+      ]
+    },
+
+    "attributes": {
+      "patterns": [
+        {
+          "comment": "Attribute block: #[...]",
+          "name": "meta.attribute.r65",
+          "begin": "#\\[",
+          "end": "\\]",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.attribute.begin.r65" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.attribute.end.r65" }
+          },
+          "patterns": [
+            {
+              "comment": "Known attribute names",
+              "name": "entity.other.attribute-name.r65",
+              "match": "\\b(bank|hw|ram|lowram|zeropage|cfg|snesrom|stack|entry|interrupt|inline|preserves|mode|databank|not)\\b"
+            },
+            { "include": "#strings" },
+            { "include": "#numbers" }
+          ]
+        }
+      ]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "comment": "Hex literal: 0xFF or 0xFF_u8",
+          "name": "constant.numeric.hex.r65",
+          "match": "\\b0[xX][0-9a-fA-F_]+(u8|u16|i8|i16)?\\b"
+        },
+        {
+          "comment": "Binary literal: 0b1010",
+          "name": "constant.numeric.binary.r65",
+          "match": "\\b0[bB][01_]+(u8|u16|i8|i16)?\\b"
+        },
+        {
+          "comment": "Decimal literal with optional type suffix",
+          "name": "constant.numeric.decimal.r65",
+          "match": "\\b[0-9][0-9_]*(u8|u16|i8|i16)?\\b"
+        }
+      ]
+    },
+
+    "function-definition": {
+      "patterns": [
+        {
+          "comment": "Function definition: [const] [far] fn name",
+          "match": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.fn.r65" },
+            "2": { "name": "entity.name.function.r65" }
+          }
+        }
+      ]
+    },
+
+    "type-definition": {
+      "patterns": [
+        {
+          "comment": "Struct/enum/trait/type definition",
+          "match": "\\b(struct|enum|trait|type)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.r65" },
+            "2": { "name": "entity.name.type.r65" }
+          }
+        }
+      ]
+    },
+
+    "macro-definition": {
+      "patterns": [
+        {
+          "comment": "Macro definition: macro_rules! name",
+          "match": "\\b(macro_rules)\\s*(!\\s*)([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.macro.r65" },
+            "2": { "name": "punctuation.definition.macro.r65" },
+            "3": { "name": "entity.name.function.macro.r65" }
+          }
+        }
+      ]
+    },
+
+    "macro-invocation": {
+      "patterns": [
+        {
+          "comment": "Macro invocation: name!(...) but not !=",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(!)(?!=)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.macro.r65" },
+            "2": { "name": "punctuation.definition.macro.r65" }
+          }
+        }
+      ]
+    },
+
+    "include-invocation": {
+      "patterns": [
+        {
+          "comment": "include! and include_bytes! invocations",
+          "match": "\\b(include|include_bytes)\\s*(!)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "keyword.other.include.r65" },
+            "2": { "name": "punctuation.definition.macro.r65" }
+          }
+        }
+      ]
+    },
+
+    "asm-invocation": {
+      "patterns": [
+        {
+          "comment": "asm! invocation",
+          "match": "\\b(asm)\\s*(!)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "keyword.other.asm.r65" },
+            "2": { "name": "punctuation.definition.macro.r65" }
+          }
+        }
+      ]
+    },
+
+    "keywords-control": {
+      "patterns": [
+        {
+          "name": "keyword.control.r65",
+          "match": "\\b(if|else|loop|while|for|in|break|continue|return|match)\\b"
+        }
+      ]
+    },
+
+    "keywords-declaration": {
+      "patterns": [
+        {
+          "name": "keyword.other.r65",
+          "match": "\\b(fn|far|near|let|mut|const|static|struct|enum|type|trait|impl|self|as|asm|include|include_bytes|macro_rules|dyn|const_assert)\\b"
+        }
+      ]
+    },
+
+    "keywords-reserved": {
+      "patterns": [
+        {
+          "comment": "Reserved Rust keywords not yet used in R65",
+          "name": "keyword.reserved.r65",
+          "match": "\\b(abstract|override|unsized|virtual|typeof|unsafe|extern|become|async|await|where|super|yield|crate|final|move|priv|Self|box|pub|ref|try|use|do)\\b"
+        }
+      ]
+    },
+
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.r65",
+          "match": "\\b(u8|u16|i8|i16|bool)\\b"
+        }
+      ]
+    },
+
+    "booleans": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.r65",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+
+    "registers": {
+      "patterns": [
+        {
+          "comment": "CPU hardware registers (single-letter must use word boundary carefully)",
+          "name": "variable.language.register.r65",
+          "match": "\\b(STATUS|DBR|PBR)\\b"
+        },
+        {
+          "comment": "Single-letter registers: only in register contexts (after @, standalone assignment, or as known register)",
+          "name": "variable.language.register.r65",
+          "match": "(?<=@\\s?)([ABXYDS])\\b|(?<=@)([ABXYDS])\\b"
+        }
+      ]
+    },
+
+    "labels": {
+      "patterns": [
+        {
+          "comment": "Loop label definition: 'outer:",
+          "name": "entity.name.label.r65",
+          "match": "'[a-zA-Z_][a-zA-Z0-9_]*:"
+        },
+        {
+          "comment": "Loop label reference: 'outer",
+          "name": "variable.other.label.r65",
+          "match": "'[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+
+    "macro-variables": {
+      "patterns": [
+        {
+          "comment": "Macro variable: $name",
+          "name": "variable.other.macro.r65",
+          "match": "\\$[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "comment": "Compound assignment operators",
+          "name": "keyword.operator.assignment.compound.r65",
+          "match": "<<=|>>=|\\+=|-=|\\*=|/=|&=|\\|=|\\^="
+        },
+        {
+          "comment": "Comparison operators",
+          "name": "keyword.operator.comparison.r65",
+          "match": "==|!=|<=|>="
+        },
+        {
+          "comment": "Shift operators",
+          "name": "keyword.operator.bitwise.r65",
+          "match": "<<|>>"
+        },
+        {
+          "comment": "Logical operators",
+          "name": "keyword.operator.logical.r65",
+          "match": "&&|\\|\\|"
+        },
+        {
+          "comment": "Range operators",
+          "name": "keyword.operator.range.r65",
+          "match": "\\.\\.=|\\.\\."
+        },
+        {
+          "comment": "Arrow operator",
+          "name": "keyword.operator.arrow.r65",
+          "match": "->"
+        },
+        {
+          "comment": "Increment/decrement",
+          "name": "keyword.operator.arithmetic.r65",
+          "match": "\\+\\+|--"
+        },
+        {
+          "comment": "Assignment",
+          "name": "keyword.operator.assignment.r65",
+          "match": "="
+        },
+        {
+          "comment": "Arithmetic operators",
+          "name": "keyword.operator.arithmetic.r65",
+          "match": "[+\\-*/]"
+        },
+        {
+          "comment": "Bitwise operators",
+          "name": "keyword.operator.bitwise.r65",
+          "match": "[&|^~]"
+        },
+        {
+          "comment": "Comparison (single char)",
+          "name": "keyword.operator.comparison.r65",
+          "match": "[<>]"
+        },
+        {
+          "comment": "Logical not / macro bang",
+          "name": "keyword.operator.logical.r65",
+          "match": "!"
+        },
+        {
+          "comment": "Register binding",
+          "name": "keyword.operator.binding.r65",
+          "match": "@"
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        {
+          "comment": "Path separator",
+          "name": "punctuation.separator.path.r65",
+          "match": "::"
+        },
+        {
+          "name": "punctuation.semi.r65",
+          "match": ";"
+        }
+      ]
+    }
+  }
+}
