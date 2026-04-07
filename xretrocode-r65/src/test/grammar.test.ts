@@ -224,6 +224,38 @@ describe('R65 TextMate Grammar', () => {
         });
     });
 
+    describe('bindings', () => {
+        it('should highlight @ as binding operator with register', () => {
+            assertHasScope('fn add(a @ A: u8) {', '@', 'keyword.operator.binding');
+        });
+
+        it('should highlight register after @ in parameter', () => {
+            assertHasScope('fn add(a @ A: u8) {', 'A', 'variable.language.register');
+        });
+
+        it('should highlight X register after @', () => {
+            assertHasScope('fn f(idx @ X: u16) {', 'X', 'variable.language.register');
+        });
+
+        it('should highlight variable binding after @', () => {
+            assertHasScope('fn add(a @ INPUT_A: u8) {', 'INPUT_A', 'variable.other.binding');
+        });
+
+        it('should highlight @ and variable in let binding', () => {
+            assertHasScope('let v @ A = compute();', '@', 'keyword.operator.binding');
+            assertHasScope('let v @ A = compute();', 'A', 'variable.language.register');
+        });
+
+        it('should highlight multi-letter register STATUS after @', () => {
+            assertHasScope('val @ STATUS', 'STATUS', 'variable.language.register');
+            assertHasScope('val @ STATUS', '@', 'keyword.operator.binding');
+        });
+
+        it('should highlight variable binding with lowercase name', () => {
+            assertHasScope('a @ my_var: u8', 'my_var', 'variable.other.binding');
+        });
+    });
+
     describe('real R65 code snippets', () => {
         it('should tokenize a function with register binding', () => {
             const line = 'far fn player_horz_div(n @ A: u8) -> u8 {';

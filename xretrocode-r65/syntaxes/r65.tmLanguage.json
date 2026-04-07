@@ -18,6 +18,7 @@
     { "include": "#keywords-reserved" },
     { "include": "#types" },
     { "include": "#booleans" },
+    { "include": "#bindings" },
     { "include": "#registers" },
     { "include": "#labels" },
     { "include": "#macro-variables" },
@@ -226,17 +227,33 @@
       ]
     },
 
+    "bindings": {
+      "patterns": [
+        {
+          "comment": "Register binding: @ A, @ X, @ STATUS, etc.",
+          "match": "(@)\\s*\\b(A|B|X|Y|D|S|STATUS|DBR|PBR)\\b",
+          "captures": {
+            "1": { "name": "keyword.operator.binding.r65" },
+            "2": { "name": "variable.language.register.r65" }
+          }
+        },
+        {
+          "comment": "Variable binding: @ VARIABLE_NAME",
+          "match": "(@)\\s*\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "keyword.operator.binding.r65" },
+            "2": { "name": "variable.other.binding.r65" }
+          }
+        }
+      ]
+    },
+
     "registers": {
       "patterns": [
         {
-          "comment": "CPU hardware registers (single-letter must use word boundary carefully)",
+          "comment": "CPU hardware registers (multi-letter, safe to match without context)",
           "name": "variable.language.register.r65",
           "match": "\\b(STATUS|DBR|PBR)\\b"
-        },
-        {
-          "comment": "Single-letter registers: only in register contexts (after @, standalone assignment, or as known register)",
-          "name": "variable.language.register.r65",
-          "match": "(?<=@\\s?)([ABXYDS])\\b|(?<=@)([ABXYDS])\\b"
         }
       ]
     },
