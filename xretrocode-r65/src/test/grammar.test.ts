@@ -195,6 +195,58 @@ describe('R65 TextMate Grammar', () => {
             assertHasScope('$x + $y', '$x', 'variable.other.macro');
             assertHasScope('$x + $y', '$y', 'variable.other.macro');
         });
+
+        it('should highlight macro fragment-type specifiers', () => {
+            assertHasScope('macro_rules! m($x:expr) {', '$x', 'variable.other.macro');
+            assertHasScope('macro_rules! m($x:expr) {', 'expr', 'storage.type.fragment');
+            assertHasScope('macro_rules! m($s:ident, $n:literal) {', 'ident', 'storage.type.fragment');
+            assertHasScope('macro_rules! m($s:ident, $n:literal) {', 'literal', 'storage.type.fragment');
+            assertHasScope('macro_rules! m($b:tt) {', 'tt', 'storage.type.fragment');
+        });
+
+        it('should highlight repeated macro params', () => {
+            assertHasScope('macro_rules! p($fmt:literal, $($args:expr),*) {', '$args', 'variable.other.macro');
+            assertHasScope('macro_rules! p($fmt:literal, $($args:expr),*) {', 'expr', 'storage.type.fragment');
+        });
+    });
+
+    describe('character literals', () => {
+        it('should highlight a simple char literal', () => {
+            assertHasScope("buf[0] = '0' as u8;", "'0'", 'string.quoted.single');
+        });
+
+        it('should highlight a punctuation char literal', () => {
+            assertHasScope("buf[pos] = '.' as u8;", "'.'", 'string.quoted.single');
+        });
+
+        it('should highlight a byte literal', () => {
+            assertHasScope("let c = b'a';", "b'a'", 'string.quoted.single');
+        });
+
+        it('should highlight an escape char literal', () => {
+            // The escape capture splits the literal into '/\n/' sub-tokens, all
+            // scoped string.quoted.single, with the escape additionally marked.
+            assertHasScope("let nl = '\\n';", "\\n", 'constant.character.escape');
+            assertHasScope("let nl = '\\n';", "\\n", 'string.quoted.single');
+        });
+
+        it('should still treat loop labels as labels, not char literals', () => {
+            const tokens = getScopes("'outer: loop {");
+            const label = tokens.find(t => t.text.includes("'outer:"));
+            assert.ok(label, 'Label token not found');
+            assert.ok(label.scopes.some(s => s.includes('label')));
+            assert.ok(!label.scopes.some(s => s.includes('string.quoted.single')));
+        });
+    });
+
+    describe('extern and include_asm', () => {
+        it('should highlight extern as a declaration keyword', () => {
+            assertHasScope('extern fn putchar(c @ A: u8);', 'extern', 'keyword.other');
+        });
+
+        it('should highlight include_asm! invocation', () => {
+            assertHasScope('include_asm!("font.asm");', 'include_asm', 'keyword.other.include');
+        });
     });
 
     describe('labels', () => {
