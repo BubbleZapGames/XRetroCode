@@ -1,8 +1,8 @@
 import * as assert from 'assert';
-import { workspace, window, Uri } from './vscode-mock';
+import { workspace, window, env, Uri } from './vscode-mock';
 import { findRoms, pickRom, ROM_EXTENSIONS } from '../romLocator';
 import { ConfigurationProvider } from '../debugConfiguration';
-import { locateMesenGdb, setExtensionPath, MESEN_BINARY_NAME } from '../debugAdapter';
+import { locateMesenGdb, setExtensionPath, MESEN_BINARY_NAME, MESEN_RELEASES_URL } from '../debugAdapter';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -162,6 +162,19 @@ describe('Adapter binary resolution', () => {
     } as any);
     assert.strictEqual(result, undefined);
     assert.ok(window._messages.some(m => m.includes('mesen-gdb')));
+  });
+
+  it('should open the releases page and stop the launch when asked to download', async () => {
+    env._reset();
+    window._setErrorMessageChoice('Download mesen-gdb');
+    const provider = new ConfigurationProvider();
+    const result = await provider.resolveDebugConfiguration(undefined, {
+      name: 'Launch ROM', type: 'xretrocode', request: 'launch', romPath: '/test/build/game.sfc'
+    } as any);
+    assert.strictEqual(result, undefined, 'nothing to launch until the binary is installed');
+    assert.deepStrictEqual(env._opened.map(u => u.path), [MESEN_RELEASES_URL]);
+    assert.strictEqual(window._openDialogCalls.length, 0, 'no file picker for a download');
+    assert.strictEqual(workspace._updates.length, 0, 'nothing saved to settings');
   });
 
   it('should not prompt when mesenDapPath is already set', async () => {

@@ -120,6 +120,15 @@ export namespace languages {
     }
 }
 
+export namespace env {
+    export const _opened: Uri[] = [];
+    export function openExternal(uri: Uri): Promise<boolean> {
+        _opened.push(uri);
+        return Promise.resolve(true);
+    }
+    export function _reset() { _opened.length = 0; }
+}
+
 export namespace window {
     export const _messages: string[] = [];
 

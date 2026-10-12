@@ -4,6 +4,9 @@ import * as fs from 'fs';
 
 export const MESEN_BINARY_NAME = 'mesen-gdb';
 
+/** Prebuilt mesen-gdb binaries, offered when none is installed. */
+export const MESEN_RELEASES_URL = 'https://github.com/BubbleZapGames/Mesen-GDB/releases';
+
 /** Where this extension is installed; set at activation. */
 let extensionPath: string | undefined;
 
@@ -96,14 +99,21 @@ export function locateMesenGdb(session?: vscode.DebugSession): string | undefine
 
 /**
  * Ask the user to point at mesen-gdb and remember the answer, so this is a
- * one-time prompt rather than a hand-edited setting.
+ * one-time prompt rather than a hand-edited setting. Without a binary at all,
+ * offer the releases page; the launch stops so they can retry once installed.
  */
 export async function promptForMesenGdb(): Promise<string | undefined> {
     const LOCATE = 'Locate mesen-gdb...';
+    const DOWNLOAD = 'Download mesen-gdb';
     const choice = await vscode.window.showErrorMessage(
-        `Could not find the ${MESEN_BINARY_NAME} debug adapter. Build it with "make" in Mesen-GDB, or point XRetroCode at an existing build.`,
-        LOCATE
+        `Could not find the ${MESEN_BINARY_NAME} debug adapter. Download a release, build it with "make" in Mesen-GDB, or point XRetroCode at an existing build.`,
+        LOCATE,
+        DOWNLOAD
     );
+    if(choice === DOWNLOAD) {
+        await vscode.env.openExternal(vscode.Uri.parse(MESEN_RELEASES_URL));
+        return undefined;
+    }
     if(choice !== LOCATE) {
         return undefined;
     }
