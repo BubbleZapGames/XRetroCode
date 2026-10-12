@@ -23,6 +23,8 @@ function mapKind(kind: R65SymbolKind): vscode.SymbolKind {
     case R65SymbolKind.Static: return vscode.SymbolKind.Variable;
     case R65SymbolKind.Macro: return vscode.SymbolKind.Function;
     case R65SymbolKind.Impl: return vscode.SymbolKind.Namespace;
+    case R65SymbolKind.Union: return vscode.SymbolKind.Struct;
+    case R65SymbolKind.EnumMember: return vscode.SymbolKind.EnumMember;
   }
 }
 
@@ -30,6 +32,9 @@ function buildHierarchy(symbols: R65Symbol[]): vscode.DocumentSymbol[] {
   const result: vscode.DocumentSymbol[] = [];
   // Collect impl block symbols as containers
   const implSymbols: Map<string, vscode.DocumentSymbol> = new Map();
+  // Traits hold their declared methods, enums their variants
+  const traitSymbols: Map<string, vscode.DocumentSymbol> = new Map();
+  const enumSymbols: Map<string, vscode.DocumentSymbol> = new Map();
 
   // First pass: create all DocumentSymbols
   for (const sym of symbols) {
@@ -49,8 +54,14 @@ function buildHierarchy(symbols: R65Symbol[]): vscode.DocumentSymbol[] {
       sym.name, '', mapKind(sym.kind), sym.range, sym.selectionRange
     );
 
-    if (sym.container && implSymbols.has(sym.container)) {
-      implSymbols.get(sym.container)!.children.push(ds);
+    if (sym.kind === R65SymbolKind.Trait) traitSymbols.set(sym.name, ds);
+    if (sym.kind === R65SymbolKind.Enum) enumSymbols.set(sym.name, ds);
+
+    const parent = !sym.container ? undefined
+      : sym.kind === R65SymbolKind.EnumMember ? enumSymbols.get(sym.container)
+      : implSymbols.get(sym.container) ?? traitSymbols.get(sym.container);
+    if (parent) {
+      parent.children.push(ds);
     } else {
       result.push(ds);
     }

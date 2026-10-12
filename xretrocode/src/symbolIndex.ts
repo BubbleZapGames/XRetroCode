@@ -10,6 +10,8 @@ export enum R65SymbolKind {
   Static,
   Macro,
   Impl,
+  Union,
+  EnumMember,
 }
 
 export interface R65Symbol {
@@ -18,8 +20,12 @@ export interface R65Symbol {
   uri: vscode.Uri;
   range: vscode.Range;
   selectionRange: vscode.Range;
+  /** Impl target type, trait, or (for an EnumMember) enum that holds this symbol. */
   container?: string;
-  /** For const/static: the declared type name, used to resolve method receivers. */
+  /**
+   * For const/static: the declared type name, used to resolve method receivers.
+   * For an EnumMember: the payload struct, so a binding like `Shape::Circle(c)` types `c`.
+   */
   declaredType?: string;
 }
 
@@ -31,8 +37,9 @@ interface PatternDef {
 }
 
 const PATTERNS: PatternDef[] = [
-  { pattern: /\b(?:const\s+)?(?:far\s+)?fn\s+(?<fn_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\(/, kind: R65SymbolKind.Function, nameGroup: 'fn_name' },
+  { pattern: /\b(?:const\s+)?(?:(?:far|near)\s+)?fn\s+(?<fn_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\(/, kind: R65SymbolKind.Function, nameGroup: 'fn_name' },
   { pattern: /\bstruct\s+(?<struct_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Struct, nameGroup: 'struct_name' },
+  { pattern: /\bunion\s+(?<union_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Union, nameGroup: 'union_name' },
   { pattern: /\benum\s+(?<enum_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Enum, nameGroup: 'enum_name' },
   { pattern: /\btrait\s+(?<trait_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Trait, nameGroup: 'trait_name' },
   { pattern: /\btype\s+(?<type_name>[A-Z][a-zA-Z0-9_]*)\s*=/, kind: R65SymbolKind.TypeAlias, nameGroup: 'type_name' },
@@ -43,6 +50,45 @@ const PATTERNS: PatternDef[] = [
 
 const IMPL_PATTERN = /\bimpl\s+(?:far\s+)?(?<traitOrType>[A-Z][a-zA-Z0-9_]*)(?:\s+for\s+(?<implTarget>[A-Z][a-zA-Z0-9_]*))?\s*\{/;
 
+/** `trait Name {` / `trait Sub: Super1 + Super2 {` — its methods may carry default bodies */
+const TRAIT_PATTERN = /\btrait\s+(?<traitName>[A-Z][a-zA-Z0-9_]*)[^{]*\{/;
+
+/** `enum Name {` — variants follow, on this line or the next ones */
+const ENUM_OPEN_PATTERN = /\benum\s+(?<enumName>[A-Z][a-zA-Z0-9_]*)\s*\{/;
+
+/** A variant at the start of an enum item: `Circle(Circle)`, `None`, `Bpp2 = 16` */
+const VARIANT_PATTERN = /(?:^|[{,])\s*(?<variant>[a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\(\s*(?<payload>[a-zA-Z_][a-zA-Z0-9_]*)\s*\))?/g;
+
+/** Blank out a trailing `//` comment, keeping columns intact. */
+function maskLineComment(line: string): string {
+  const at = line.indexOf('//');
+  return at < 0 ? line : line.substring(0, at) + ' '.repeat(line.length - at);
+}
+
+/**
+ * Variants in `text`, which is one line of an enum body with everything
+ * outside the body blanked. Columns are those of the original line.
+ */
+function parseVariants(
+  text: string, line: number, enumName: string, uri: vscode.Uri, fullLine: string
+): R65Symbol[] {
+  const found: R65Symbol[] = [];
+  for (const m of text.matchAll(VARIANT_PATTERN)) {
+    const name = m.groups!.variant;
+    const nameStart = m.index! + m[0].indexOf(name);
+    found.push({
+      name,
+      kind: R65SymbolKind.EnumMember,
+      uri,
+      range: new vscode.Range(line, 0, line, fullLine.length),
+      selectionRange: new vscode.Range(line, nameStart, line, nameStart + name.length),
+      container: enumName,
+      declaredType: m.groups!.payload,
+    });
+  }
+  return found;
+}
+
 export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[] {
   const lines = text.split('\n');
   const symbols: R65Symbol[] = [];
@@ -50,6 +96,8 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
   let currentContainer: string | undefined;
   let containerBraceDepth = 0;
   let braceDepth = 0;
+  // Set while inside an enum body that runs past its header line
+  let openEnum: string | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -74,7 +122,18 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
       continue;
     }
 
-    // Count braces for impl container tracking
+    // Enum variants. A body can't nest braces, so the first `}` closes it.
+    if (openEnum) {
+      const masked = maskLineComment(line);
+      const close = masked.indexOf('}');
+      const body = close < 0 ? masked : masked.substring(0, close) + ' '.repeat(masked.length - close);
+      symbols.push(...parseVariants(body, i, openEnum, uri, line));
+      if (close < 0) continue;
+      openEnum = undefined;
+    }
+
+    // Count braces for impl/trait container tracking
+    const depthBeforeLine = braceDepth;
     for (const ch of line) {
       if (ch === '{') braceDepth++;
       if (ch === '}') braceDepth--;
@@ -110,13 +169,36 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
       break; // Only match one pattern per line
     }
 
+    // Enum header: variants may start after its `{` on this same line
+    const enumMatch = maskLineComment(line).match(ENUM_OPEN_PATTERN);
+    if (enumMatch?.groups) {
+      const enumName = enumMatch.groups.enumName;
+      const masked = maskLineComment(line);
+      const open = enumMatch.index! + enumMatch[0].length;
+      const close = masked.indexOf('}', open);
+      const end = close < 0 ? masked.length : close;
+      const body = ' '.repeat(open) + masked.substring(open, end) + ' '.repeat(masked.length - end);
+      symbols.push(...parseVariants(body, i, enumName, uri, line));
+      if (close < 0) openEnum = enumName;
+      continue;
+    }
+
+    // A block left open past this line holds the following methods. Its depth
+    // is the one before this line's braces, so `impl Foo {}` closes at once.
+    const traitMatch = line.match(TRAIT_PATTERN);
+    if (traitMatch?.groups) {
+      currentContainer = traitMatch.groups.traitName;
+      containerBraceDepth = depthBeforeLine;
+      if (braceDepth <= containerBraceDepth) currentContainer = undefined;
+    }
+
     // Track impl blocks for container context
     const implMatch = line.match(IMPL_PATTERN);
     if (implMatch?.groups) {
       const implName = implMatch.groups.implTarget || implMatch.groups.traitOrType;
       currentContainer = implName;
-      // braceDepth already includes the { on this line, so container depth is one less
-      containerBraceDepth = braceDepth - 1;
+      containerBraceDepth = depthBeforeLine;
+      if (braceDepth <= containerBraceDepth) currentContainer = undefined;
 
       // Add impl as a symbol too (for Outline view)
       const traitOrType = implMatch.groups.traitOrType;
@@ -193,6 +275,20 @@ export class R65SymbolIndex implements vscode.Disposable {
 
   lookup(name: string): R65Symbol[] {
     return this.symbols.get(name) || [];
+  }
+
+  /** Traits named by an `impl Trait for Type` anywhere in the workspace. */
+  traitsImplementedBy(type: string): Set<string> {
+    const suffix = ` for ${type}`;
+    const traits = new Set<string>();
+    for (const syms of this.fileSymbols.values()) {
+      for (const s of syms) {
+        if (s.kind === R65SymbolKind.Impl && s.name.endsWith(suffix)) {
+          traits.add(s.name.slice(0, -suffix.length));
+        }
+      }
+    }
+    return traits;
   }
 
   getFileSymbols(uri: vscode.Uri): R65Symbol[] {

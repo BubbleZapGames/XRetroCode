@@ -9,10 +9,12 @@
     { "include": "#attributes" },
     { "include": "#numbers" },
     { "include": "#function-definition" },
+    { "include": "#enum-definition" },
     { "include": "#type-definition" },
     { "include": "#macro-definition" },
     { "include": "#include-invocation" },
     { "include": "#asm-invocation" },
+    { "include": "#paths" },
     { "include": "#macro-invocation" },
     { "include": "#keywords-control" },
     { "include": "#keywords-declaration" },
@@ -87,13 +89,19 @@
             {
               "comment": "Known attribute names",
               "name": "entity.other.attribute-name.r65",
-              "match": "\\b(bank|hw|ram|lowram|zeropage|cfg|snesrom|stack|entry|interrupt|inline|preserves|mode|databank|not)\\b"
+              "match": "\\b(bank|hw|ram|lowram|zeropage|cfg|snesrom|stack|entry|interrupt|inline|preserves|mode|soa|used|allow|databank|preserve|not)\\b"
             },
             {
-              "comment": "Directive value keyword: #[bank(auto)]",
+              "comment": "Directive value keywords: #[bank(auto)], #[inline(always)], #[interrupt(nmi)], #[allow(all)]",
               "name": "constant.language.r65",
-              "match": "\\bauto\\b"
+              "match": "\\b(auto|always|never|nmi|irq|brk|cop|abort|all)\\b"
             },
+            {
+              "comment": "Lint code: #[allow(C001)]",
+              "name": "constant.other.lint-code.r65",
+              "match": "\\b[A-Z][0-9]{3}\\b"
+            },
+            { "include": "#booleans" },
             { "include": "#strings" },
             { "include": "#numbers" }
           ]
@@ -134,11 +142,77 @@
       ]
     },
 
+    "enum-definition": {
+      "patterns": [
+        {
+          "comment": "Enum body: variants, optional payload struct, optional discriminant. A brace on the next line falls back to #type-definition.",
+          "begin": "\\b(enum)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(\\{)",
+          "end": "\\}",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.r65" },
+            "2": { "name": "entity.name.type.r65" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            {
+              "comment": "Payload variant: Circle(Circle)",
+              "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(\\()\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*(\\))",
+              "captures": {
+                "1": { "name": "variable.other.enummember.r65" },
+                "3": { "name": "entity.name.type.r65" }
+              }
+            },
+            {
+              "comment": "Unit variant, with or without = discriminant",
+              "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b(?=\\s*(?:=(?!=)|,|\\}|$))",
+              "captures": {
+                "1": { "name": "variable.other.enummember.r65" }
+              }
+            },
+            { "include": "#numbers" },
+            { "include": "#char-literals" },
+            { "include": "#operators" }
+          ]
+        }
+      ]
+    },
+
+    "paths": {
+      "patterns": [
+        {
+          "comment": "Associated macro: Type::name!(args) — the type here; the name is left to #macro-invocation",
+          "match": "\\b([A-Z][a-zA-Z0-9_]*)\\s*(::)(?=\\s*[a-zA-Z_][a-zA-Z0-9_]*\\s*!(?!=))",
+          "captures": {
+            "1": { "name": "entity.name.type.r65" },
+            "2": { "name": "punctuation.separator.path.r65" }
+          }
+        },
+        {
+          "comment": "Associated function: Q10::from(...), U32::div_u8",
+          "match": "\\b([A-Z][a-zA-Z0-9_]*)\\s*(::)\\s*([a-z_][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.r65" },
+            "2": { "name": "punctuation.separator.path.r65" },
+            "3": { "name": "entity.name.function.r65" }
+          }
+        },
+        {
+          "comment": "Enum variant: Shape::Circle, Screen::BG1, in expressions and patterns",
+          "match": "\\b([A-Z][a-zA-Z0-9_]*)\\s*(::)\\s*([A-Z][a-zA-Z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.r65" },
+            "2": { "name": "punctuation.separator.path.r65" },
+            "3": { "name": "variable.other.enummember.r65" }
+          }
+        }
+      ]
+    },
+
     "type-definition": {
       "patterns": [
         {
-          "comment": "Struct/enum/trait/type definition",
-          "match": "\\b(struct|enum|trait|type)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "comment": "Struct/union/enum/trait/type definition",
+          "match": "\\b(struct|union|enum|trait|type)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.r65" },
             "2": { "name": "entity.name.type.r65" }
@@ -213,7 +287,7 @@
       "patterns": [
         {
           "name": "keyword.other.r65",
-          "match": "\\b(fn|far|near|let|mut|const|static|struct|enum|type|trait|impl|self|as|asm|extern|include_bytes|include_asm|include|macro_rules|dyn)\\b"
+          "match": "\\b(fn|far|near|let|mut|const|static|struct|union|enum|type|trait|impl|self|as|asm|extern|include_bytes|include_asm|include|macro_rules|dyn)\\b"
         }
       ]
     },

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { Uri, Position, Range, Location, workspace } from './vscode-mock';
+import { Uri, Position, Range, Location, SymbolKind, workspace } from './vscode-mock';
 import { parseSymbolsFromText, R65SymbolKind, R65SymbolIndex } from '../symbolIndex';
 import { R65DefinitionProvider } from '../definitionProvider';
 import { R65DocumentSymbolProvider } from '../documentSymbolProvider';
@@ -231,6 +231,57 @@ describe('Symbol Parsing', () => {
     assert.strictEqual(impls[0].name, 'Drawable for Player');
   });
 
+  it('should parse union definition', () => {
+    const sym = findByName(parse('union Reg { lo: u8, hi: u16 }'), 'Reg');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Union);
+  });
+
+  it('should parse near fn definition', () => {
+    const sym = findByName(parse('near fn tick() {'), 'tick');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Function);
+  });
+
+  it('should track trait container for default and required methods', () => {
+    const code = 'trait Area: Shape {\n  fn area(*self) -> u8 {\n    0\n  }\n  fn name(*self) -> u8;\n}\nfn free() {';
+    const syms = parse(code);
+    assert.strictEqual(findByName(syms, 'area')!.container, 'Area');
+    assert.strictEqual(findByName(syms, 'name')!.container, 'Area');
+    assert.strictEqual(findByName(syms, 'free')!.container, undefined);
+  });
+
+  it('should close an impl block opened and closed on one line', () => {
+    const syms = parse('impl Player {}\nfn standalone() {');
+    assert.strictEqual(findByName(syms, 'standalone')!.container, undefined);
+  });
+
+  it('should parse single-line enum variants', () => {
+    const syms = parse('enum Screen { BG1 = 0x01, BG2 = 0x02, Obj = 0x10 }');
+    const members = findByKind(syms, R65SymbolKind.EnumMember);
+    assert.deepStrictEqual(members.map(m => m.name), ['BG1', 'BG2', 'Obj']);
+    assert.ok(members.every(m => m.container === 'Screen'));
+    assert.strictEqual(members[1].selectionRange.start.character, 'enum Screen { BG1 = 0x01, '.length);
+  });
+
+  it('should parse multi-line enum variants with payloads', () => {
+    const code = [
+      'enum Shape {',
+      '    /// round one',
+      '    Circle(Circle), // trailing',
+      '    Square( Sq ),',
+      '    None',
+      '}',
+      'fn after() {',
+    ].join('\n');
+    const syms = parse(code);
+    const members = findByKind(syms, R65SymbolKind.EnumMember);
+    assert.deepStrictEqual(members.map(m => m.name), ['Circle', 'Square', 'None']);
+    assert.deepStrictEqual(members.map(m => m.declaredType), ['Circle', 'Sq', undefined]);
+    assert.strictEqual(members[0].selectionRange.start.line, 2);
+    assert.strictEqual(findByName(syms, 'after')!.container, undefined);
+  });
+
   it('should parse multiple definitions', () => {
     const code = 'struct Player {\n  x: u8,\n}\nfn update() {\n}\nconst MAX: u8 = 10;';
     const syms = parse(code);
@@ -444,6 +495,130 @@ describe('Definition Provider', () => {
     assert.strictEqual((result as any[]).length, 2);
   });
 
+  it('should narrow Type::name! to that type\'s macro', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'macro_rules! set($x:expr) {',
+      '}',
+      'impl Oam {',
+      '    macro_rules! set($x:expr) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('    Oam::set!(1);', '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 10) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 3, 'should land on the Oam impl, not the free macro');
+  });
+
+  it('should go to an enum variant rather than a same-named struct', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'struct Circle { r: u8 }',
+      'enum Shape { Circle(Circle), None }',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+    const provider = new R65DefinitionProvider(index);
+
+    const variantDoc = createMockDocument('    s = Shape::Circle(c);', '/test/caller.r65');
+    const variant = provider.provideDefinition(variantDoc, new Position(0, 16) as any, { isCancellationRequested: false } as any);
+    assert.ok(variant && !Array.isArray(variant));
+    assert.strictEqual((variant as any).range.start.line, 1);
+    assert.strictEqual((variant as any).range.start.character, 'enum Shape { '.length);
+
+    const structDoc = createMockDocument('    let c: Circle = Circle { r: 5 };', '/test/caller.r65');
+    const struct = provider.provideDefinition(structDoc, new Position(0, 22) as any, { isCancellationRequested: false } as any);
+    assert.ok(struct && !Array.isArray(struct));
+    assert.strictEqual((struct as any).range.start.line, 0);
+  });
+
+  it('should resolve a method a type inherits from a trait default', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'trait Area {',
+      '    fn area(*self) -> u8 {',
+      '        0',
+      '    }',
+      '}',
+      'impl Area for Meters {',
+      '}',
+      'impl Other {',
+      '    fn area(*self) -> u8 {',
+      '    }',
+      '}',
+    ].join('\n'));
+    workspace._setFileContent('/test/game.r65', 'static m: Meters;');
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+    await index.indexFile(Uri.file('/test/game.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('    m.area();', '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 7) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 1, 'should land on the trait default');
+  });
+
+  it('should resolve self. inside a trait default body to the trait', async () => {
+    workspace._reset();
+    const lib = [
+      'trait Area {',
+      '    fn name(*self) -> u8;',
+      '    fn area(*self) -> u8 {',
+      '        self.name()',
+      '    }',
+      '}',
+      'impl Other {',
+      '    fn name(*self) -> u8 {',
+      '    }',
+      '}',
+    ].join('\n');
+    workspace._setFileContent('/test/lib.r65', lib);
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument(lib, '/test/lib.r65');
+    const result = provider.provideDefinition(doc, new Position(3, 14) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 1);
+  });
+
+  it('should type an enum payload binding from its variant', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'enum Shape { Circle(Circle), Square(Sq) }',
+      'impl Circle {',
+      '    fn area(*self) -> u8 {',
+      '    }',
+      '}',
+      'impl Sq {',
+      '    fn area(*self) -> u8 {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+    const provider = new R65DefinitionProvider(index);
+
+    for (const binding of [
+      ['    if let Shape::Square(c) = s {', '        c.area();'],
+      ['    let Shape::Square(c) = s else { return; };', '    c.area();'],
+      ['    match s {', '        Shape::Square(c) => c.area(),'],
+    ]) {
+      const doc = createMockDocument(['fn f() {', ...binding].join('\n'), '/test/caller.r65');
+      const col = binding[1].indexOf('area') + 1;
+      const result = provider.provideDefinition(doc, new Position(2, col) as any, { isCancellationRequested: false } as any);
+      assert.ok(result && !Array.isArray(result), binding.join(' / '));
+      assert.strictEqual((result as any).range.start.line, 6, `${binding.join(' / ')} should land on impl Sq`);
+    }
+  });
+
   it('should prefer a free function over a method when there is no receiver', async () => {
     workspace._reset();
     workspace._setFileContent('/test/lib.r65', [
@@ -507,6 +682,28 @@ describe('Document Symbol Provider', () => {
     assert.strictEqual(impl.children.length, 2);
     assert.strictEqual(impl.children[0].name, 'init');
     assert.strictEqual(impl.children[1].name, 'update');
+  });
+
+  it('should nest trait methods and enum variants', () => {
+    const code = [
+      'trait Area {',
+      '  fn area(*self) -> u8;',
+      '}',
+      'enum Shape { Circle(Circle), None }',
+      'impl Shape {',
+      '  fn kind(*self) -> u8 {',
+      '  }',
+      '}',
+      'union Reg { lo: u8 }',
+    ].join('\n');
+    const provider = new R65DocumentSymbolProvider();
+    const result = provider.provideDocumentSymbols(createMockDocument(code), { isCancellationRequested: false } as any) as any[];
+    assert.deepStrictEqual(result.map((s: any) => s.name), ['Area', 'Shape', 'Shape', 'Reg']);
+    assert.deepStrictEqual(result[0].children.map((c: any) => c.name), ['area']);
+    assert.deepStrictEqual(result[1].children.map((c: any) => c.name), ['Circle', 'None']);
+    assert.strictEqual(result[1].children[0].kind, SymbolKind.EnumMember);
+    assert.deepStrictEqual(result[2].children.map((c: any) => c.name), ['kind']);
+    assert.strictEqual(result[3].kind, SymbolKind.Struct);
   });
 
   it('should not nest standalone functions under impl', () => {

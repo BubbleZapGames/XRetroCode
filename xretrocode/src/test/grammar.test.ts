@@ -156,6 +156,71 @@ describe('R65 TextMate Grammar', () => {
             assertHasScope('trait Drawable {', 'trait', 'keyword.other');
             assertHasScope('trait Drawable {', 'Drawable', 'entity.name.type');
         });
+
+        it('should highlight union definitions', () => {
+            assertHasScope('union Reg { lo: u8, hi: u16 }', 'union', 'keyword.other');
+            assertHasScope('union Reg { lo: u8, hi: u16 }', 'Reg', 'entity.name.type');
+        });
+
+        it('should highlight newtype definitions', () => {
+            assertHasScope('struct Meters(u16);', 'Meters', 'entity.name.type');
+        });
+    });
+
+    describe('enums', () => {
+        it('should highlight unit variants in an enum body', () => {
+            const line = 'enum ConsoleAlign { Left, Center, Right }';
+            assertHasScope(line, 'ConsoleAlign', 'entity.name.type');
+            for (const v of ['Left', 'Center', 'Right']) {
+                assertHasScope(line, v, 'variable.other.enummember');
+            }
+        });
+
+        it('should highlight variants with discriminants', () => {
+            const line = 'enum TileSize { Bpp2 = 16, Bpp4 = 32 }';
+            assertHasScope(line, 'Bpp2', 'variable.other.enummember');
+            assertHasScope(line, '16', 'constant.numeric');
+        });
+
+        it('should highlight a payload variant and its struct', () => {
+            const tokens = getScopes('enum Shape { Circle(Circle), None }');
+            const circles = tokens.filter(t => t.text === 'Circle');
+            assert.strictEqual(circles.length, 2);
+            assert.ok(circles[0].scopes.some(s => s.includes('enummember')), 'variant');
+            assert.ok(circles[1].scopes.some(s => s.includes('entity.name.type')), 'payload type');
+        });
+
+        it('should highlight variants across lines of an enum body', () => {
+            const first = tokenizeLine('enum Shape {');
+            const second = grammar.tokenizeLine('    Circle(Circle), // round', first.ruleStack);
+            const line = '    Circle(Circle), // round';
+            const variant = second.tokens.find(t => line.substring(t.startIndex, t.endIndex) === 'Circle');
+            assert.ok(variant && variant.scopes.some(s => s.includes('enummember')));
+            const comment = second.tokens.find(t => line.substring(t.startIndex, t.endIndex) === '// round');
+            assert.ok(comment && comment.scopes.some(s => s.includes('comment.line')));
+        });
+
+        it('should highlight a variant path in a pattern', () => {
+            const line = 'if let Shape::Circle(c) = s {';
+            assertHasScope(line, 'Shape', 'entity.name.type');
+            assertHasScope(line, 'Circle', 'variable.other.enummember');
+        });
+
+        it('should highlight an all-caps variant path', () => {
+            assertHasScope('x = Screen::BG1;', 'BG1', 'variable.other.enummember');
+        });
+    });
+
+    describe('paths', () => {
+        it('should highlight an associated function', () => {
+            assertHasScope('let q = Q10::from(3);', 'Q10', 'entity.name.type');
+            assertHasScope('let q = Q10::from(3);', 'from', 'entity.name.function');
+        });
+
+        it('should highlight an associated macro', () => {
+            assertHasScope('let c = Color::rgb!(1, 2, 3);', 'Color', 'entity.name.type');
+            assertHasScope('let c = Color::rgb!(1, 2, 3);', 'rgb', 'entity.name.function.macro');
+        });
     });
 
     describe('attributes', () => {
@@ -178,6 +243,31 @@ describe('R65 TextMate Grammar', () => {
             const zpToken = tokens.find(t => t.text === 'zeropage');
             assert.ok(zpToken);
             assert.ok(zpToken.scopes.some(s => s.includes('attribute-name')));
+        });
+
+        it('should highlight soa, used and allow attributes', () => {
+            assertHasScope('#[soa]', 'soa', 'attribute-name');
+            assertHasScope('#[used]', 'used', 'attribute-name');
+            assertHasScope('#[allow(C001)]', 'allow', 'attribute-name');
+        });
+
+        it('should highlight lint codes and all in allow', () => {
+            assertHasScope('#[allow(C001, all)]', 'C001', 'constant.other.lint-code');
+            assertHasScope('#[allow(C001, all)]', 'all', 'constant.language');
+        });
+
+        it('should highlight inline and interrupt arguments', () => {
+            assertHasScope('#[inline(always)]', 'always', 'constant.language');
+            assertHasScope('#[inline(never)]', 'never', 'constant.language');
+            for (const kind of ['nmi', 'irq', 'brk', 'cop', 'abort']) {
+                assertHasScope(`#[interrupt(${kind})]`, kind, 'constant.language');
+            }
+        });
+
+        it('should highlight the interrupt preserve argument', () => {
+            const line = '#[interrupt(nmi, preserve = false)]';
+            assertHasScope(line, 'preserve', 'attribute-name');
+            assertHasScope(line, 'false', 'constant.language.boolean');
         });
     });
 
