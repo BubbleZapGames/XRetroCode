@@ -72,9 +72,15 @@ xretrocode/
     main.ts                   — activate/deactivate; wires up both halves
     debugAdapter.ts           — Factory: launches mesen-gdb --dap as subprocess
     debugConfiguration.ts     — Launch configuration provider + validation
-    symbolIndex.ts            — Workspace-wide .r65 symbol index
+    symbolIndex.ts            — Workspace-wide .r65 symbol index (fields, variants,
+                                signatures, docs)
+    typeResolver.ts           — Shared receiver/binding type resolution
     definitionProvider.ts     — Go to Definition (receiver-typed disambiguation)
     documentSymbolProvider.ts — Outline view
+    hoverProvider.ts          — Hover: signature, owner, doc comment
+    completionProvider.ts     — Completion after `.`, `Type::` and bare names
+    referenceProvider.ts      — Find All References
+    workspaceSymbolProvider.ts — Ctrl+T symbol search
     tasks.ts                  — r65c build/check task provider
     config.ts                 — Compiler settings (r65.*)
   .vscode/

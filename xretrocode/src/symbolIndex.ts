@@ -12,6 +12,7 @@ export enum R65SymbolKind {
   Impl,
   Union,
   EnumMember,
+  Field,
 }
 
 export interface R65Symbol {
@@ -20,13 +21,22 @@ export interface R65Symbol {
   uri: vscode.Uri;
   range: vscode.Range;
   selectionRange: vscode.Range;
-  /** Impl target type, trait, or (for an EnumMember) enum that holds this symbol. */
+  /** Impl target type, trait, or (for an EnumMember/Field) enum/struct that holds this symbol. */
   container?: string;
   /**
-   * For const/static: the declared type name, used to resolve method receivers.
+   * For const/static/field: the declared type, reduced to a type name by
+   * `baseTypeName`, used to resolve method receivers.
    * For an EnumMember: the payload struct, so a binding like `Shape::Circle(c)` types `c`.
    */
   declaredType?: string;
+  /** For a Function: its single non-primitive return type, if any. */
+  returnType?: string;
+  /** For a Function: whether it takes `self` (a method rather than an associated fn). */
+  hasSelf?: boolean;
+  /** The declaration as written, for hover and completion detail. */
+  signature?: string;
+  /** `///` comments above the declaration, else plain `//` ones. */
+  doc?: string;
 }
 
 interface PatternDef {
@@ -43,8 +53,8 @@ const PATTERNS: PatternDef[] = [
   { pattern: /\benum\s+(?<enum_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Enum, nameGroup: 'enum_name' },
   { pattern: /\btrait\s+(?<trait_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Trait, nameGroup: 'trait_name' },
   { pattern: /\btype\s+(?<type_name>[A-Z][a-zA-Z0-9_]*)\s*=/, kind: R65SymbolKind.TypeAlias, nameGroup: 'type_name' },
-  { pattern: /\bconst\s+(?!fn\b)(?<const_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\[?\s*(?<const_type>[a-zA-Z_][a-zA-Z0-9_]*)?/, kind: R65SymbolKind.Constant, nameGroup: 'const_name', typeGroup: 'const_type' },
-  { pattern: /\bstatic\s+(?:mut\s+)?(?<static_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\[?\s*(?<static_type>[a-zA-Z_][a-zA-Z0-9_]*)?/, kind: R65SymbolKind.Static, nameGroup: 'static_name', typeGroup: 'static_type' },
+  { pattern: /\bconst\s+(?!fn\b)(?<const_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(?<const_type>[^=;]*)/, kind: R65SymbolKind.Constant, nameGroup: 'const_name', typeGroup: 'const_type' },
+  { pattern: /\bstatic\s+(?:mut\s+)?\*?\s*(?<static_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(?<static_type>[^=;]*)/, kind: R65SymbolKind.Static, nameGroup: 'static_name', typeGroup: 'static_type' },
   { pattern: /\bmacro_rules!\s*(?<macro_name>[a-zA-Z_][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Macro, nameGroup: 'macro_name' },
 ];
 
@@ -53,54 +63,196 @@ const IMPL_PATTERN = /\bimpl\s+(?:far\s+)?(?<traitOrType>[A-Z][a-zA-Z0-9_]*)(?:\
 /** `trait Name {` / `trait Sub: Super1 + Super2 {` — its methods may carry default bodies */
 const TRAIT_PATTERN = /\btrait\s+(?<traitName>[A-Z][a-zA-Z0-9_]*)[^{]*\{/;
 
-/** `enum Name {` — variants follow, on this line or the next ones */
-const ENUM_OPEN_PATTERN = /\benum\s+(?<enumName>[A-Z][a-zA-Z0-9_]*)\s*\{/;
+/** `enum Name {` / `struct Name {` / `union Name {` — items follow, on this line or the next ones */
+const BODY_OPEN_PATTERN = /\b(?<keyword>enum|struct|union)\s+(?<bodyName>[A-Z][a-zA-Z0-9_]*)\s*\{/;
 
 /** A variant at the start of an enum item: `Circle(Circle)`, `None`, `Bpp2 = 16` */
 const VARIANT_PATTERN = /(?:^|[{,])\s*(?<variant>[a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\(\s*(?<payload>[a-zA-Z_][a-zA-Z0-9_]*)\s*\))?/g;
 
+/** A struct/union field: `x: u8`, `src: far *u8`, `far *next: Node`, `buf: [u8; 9]` */
+const FIELD_PATTERN = /(?:^|[{,])\s*(?<item>(?:(?:far|near)\s+)?\*?\s*(?<field>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(?<type>[^,]*))/g;
+
+const PRIMITIVES = new Set(['u8', 'u16', 'i8', 'i16', 'bool', 'fn']);
+
+/** `// ====` / `// ----` section banners, which are not documentation */
+const BANNER = /^\/\/\s*[=\-#*~]{3,}/;
+
 /** Blank out a trailing `//` comment, keeping columns intact. */
-function maskLineComment(line: string): string {
+export function maskLineComment(line: string): string {
   const at = line.indexOf('//');
   return at < 0 ? line : line.substring(0, at) + ' '.repeat(line.length - at);
 }
 
+/** Split `text` at commas outside any (), [] or {}. */
+export function splitTopLevel(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    else if (ch === ',' && depth === 0) {
+      parts.push(text.substring(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(text.substring(start));
+  return parts;
+}
+
 /**
- * Variants in `text`, which is one line of an enum body with everything
+ * The struct/enum/trait a type expression names: `far *dyn Shape` → `Shape`,
+ * `[Enemy; 8]` → `Enemy`. Undefined for primitives, `!`, fn types, and a
+ * multi-value list like `u8, u16`.
+ */
+export function baseTypeName(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const t = text.trim();
+  if (splitTopLevel(t).length > 1) return undefined;
+  const m = t.replace(/^(?:(?:far|near|dyn)\b\s*|\*\s*|\[\s*)+/, '').match(/^[a-zA-Z_][a-zA-Z0-9_]*/);
+  if (!m || PRIMITIVES.has(m[0])) return undefined;
+  return m[0];
+}
+
+export interface FnParam {
+  name: string;
+  /** Reduced type name; undefined for `self` and primitives. */
+  type?: string;
+  /** The parameter as written, e.g. `src: far *u8`. */
+  text: string;
+}
+
+export interface FnHeader {
+  name: string;
+  params: FnParam[];
+  returnType?: string;
+  hasSelf: boolean;
+}
+
+const FN_HEADER = /\bfn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
+const SELF_PARAM = /^(?:(?:far|near)\s+)?(?:\*\s*)?self$/;
+const PARAM = /^(?:(?:far|near)\s+)?\*?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:@\s*[a-zA-Z_][a-zA-Z0-9_]*)?\s*:\s*(.+)$/;
+
+/** Name, parameters and return type of a `fn` header written on `line`. */
+export function parseFnHeader(line: string): FnHeader | undefined {
+  const m = maskLineComment(line).match(FN_HEADER);
+  if (!m) return undefined;
+  const start = m.index! + m[0].length;
+  let depth = 1;
+  let i = start;
+  while (i < line.length && depth > 0) {
+    if (line[i] === '(') depth++;
+    else if (line[i] === ')') depth--;
+    i++;
+  }
+  const paramsText = line.substring(start, depth === 0 ? i - 1 : line.length);
+  const params: FnParam[] = [];
+  for (const raw of splitTopLevel(paramsText)) {
+    const item = raw.trim();
+    if (!item) continue;
+    if (SELF_PARAM.test(item)) {
+      params.push({ name: 'self', text: item });
+      continue;
+    }
+    const p = item.match(PARAM);
+    if (p) params.push({ name: p[1], type: baseTypeName(p[2]), text: item });
+  }
+  const ret = depth === 0 ? line.substring(i).match(/^\s*->\s*([^{;]*)/) : null;
+  return {
+    name: m[1],
+    params,
+    returnType: ret ? baseTypeName(ret[1]) : undefined,
+    hasSelf: params[0]?.name === 'self',
+  };
+}
+
+/** The declaration on `line` without attributes, body or initializer. */
+function signatureOf(line: string, kind: R65SymbolKind): string {
+  let s = maskLineComment(line).trim().replace(/^(?:#\[[^\]]*\]\s*)+/, '');
+  if (kind === R65SymbolKind.Constant || kind === R65SymbolKind.Static) {
+    const eq = s.indexOf('=');
+    if (eq >= 0) s = s.substring(0, eq);
+  } else {
+    const brace = s.indexOf('{');
+    if (brace >= 0) s = s.substring(0, brace);
+  }
+  return s.trim().replace(/;$/, '').trim();
+}
+
+/** The `//` comment trailing code on `line`, if any. */
+function trailingComment(line: string): string | undefined {
+  const at = line.indexOf('//');
+  if (at < 0 || !line.substring(0, at).trim()) return undefined;
+  const text = line.substring(at + 2).replace(/^[/!]?\s?/, '').trim();
+  return text || undefined;
+}
+
+/**
+ * Items in `text`, which is one line of an enum or struct body with everything
  * outside the body blanked. Columns are those of the original line.
  */
-function parseVariants(
-  text: string, line: number, enumName: string, uri: vscode.Uri, fullLine: string
+function parseBodyItems(
+  keyword: string, text: string, line: number, container: string, uri: vscode.Uri,
+  fullLine: string, doc: string | undefined
 ): R65Symbol[] {
   const found: R65Symbol[] = [];
-  for (const m of text.matchAll(VARIANT_PATTERN)) {
-    const name = m.groups!.variant;
-    const nameStart = m.index! + m[0].indexOf(name);
+  const isEnum = keyword === 'enum';
+  for (const m of text.matchAll(isEnum ? VARIANT_PATTERN : FIELD_PATTERN)) {
+    const name = isEnum ? m.groups!.variant : m.groups!.field;
+    const nameStart = m.index! + m[0].indexOf(name, isEnum ? 0 : m[0].indexOf(m.groups!.item));
+    const payload = isEnum ? m.groups!.payload : undefined;
     found.push({
       name,
-      kind: R65SymbolKind.EnumMember,
+      kind: isEnum ? R65SymbolKind.EnumMember : R65SymbolKind.Field,
       uri,
       range: new vscode.Range(line, 0, line, fullLine.length),
       selectionRange: new vscode.Range(line, nameStart, line, nameStart + name.length),
-      container: enumName,
-      declaredType: m.groups!.payload,
+      container,
+      declaredType: isEnum ? payload : baseTypeName(m.groups!.type),
+      signature: isEnum
+        ? `${container}::${name}${payload ? `(${payload})` : ''}`
+        : m.groups!.item.trim(),
     });
   }
+  const itemDoc = doc ?? (found.length === 1 ? trailingComment(fullLine) : undefined);
+  if (found.length > 0 && itemDoc) found[0].doc = itemDoc;
   return found;
 }
 
+export interface ScanResult {
+  symbols: R65Symbol[];
+  /** For each line, the impl target type or trait whose block holds it. */
+  lineContainers: (string | undefined)[];
+}
+
 export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[] {
+  return scanText(text, uri).symbols;
+}
+
+export function scanText(text: string, uri: vscode.Uri): ScanResult {
   const lines = text.split('\n');
   const symbols: R65Symbol[] = [];
+  const lineContainers: (string | undefined)[] = new Array(lines.length);
   let insideBlockComment = false;
   let currentContainer: string | undefined;
   let containerBraceDepth = 0;
   let braceDepth = 0;
-  // Set while inside an enum body that runs past its header line
-  let openEnum: string | undefined;
+  // Set while inside an enum/struct/union body that runs past its header line
+  let openBody: { keyword: string; name: string } | undefined;
+  // Comments directly above the next declaration
+  let docLines: string[] = [];
+  let plainLines: string[] = [];
+  const takeDoc = (): string | undefined => {
+    const lines = docLines.length > 0 ? docLines : plainLines;
+    docLines = [];
+    plainLines = [];
+    return lines.length > 0 ? lines.join('\n') : undefined;
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    lineContainers[i] = currentContainer;
 
     // Track block comments
     if (insideBlockComment) {
@@ -112,24 +264,37 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
 
     const trimmed = line.trimStart();
     if (trimmed.startsWith('//')) {
-      // Still count braces in comments? No — skip entirely
+      if (/^\/\/\/(?!\/)/.test(trimmed)) {
+        docLines.push(trimmed.substring(3).replace(/^ /, ''));
+      } else if (trimmed.startsWith('//!') || BANNER.test(trimmed)) {
+        plainLines = [];
+      } else if (!trimmed.startsWith('////')) {
+        plainLines.push(trimmed.substring(2).replace(/^ /, ''));
+      }
       continue;
     }
     if (trimmed.startsWith('/*')) {
       if (!line.includes('*/')) {
         insideBlockComment = true;
       }
+      docLines = [];
+      plainLines = [];
+      continue;
+    }
+    if (!trimmed) {
+      docLines = [];
+      plainLines = [];
       continue;
     }
 
-    // Enum variants. A body can't nest braces, so the first `}` closes it.
-    if (openEnum) {
+    // Body items. A body can't nest braces, so the first `}` closes it.
+    if (openBody) {
       const masked = maskLineComment(line);
       const close = masked.indexOf('}');
       const body = close < 0 ? masked : masked.substring(0, close) + ' '.repeat(masked.length - close);
-      symbols.push(...parseVariants(body, i, openEnum, uri, line));
+      symbols.push(...parseBodyItems(openBody.keyword, body, i, openBody.name, uri, line, takeDoc()));
       if (close < 0) continue;
-      openEnum = undefined;
+      openBody = undefined;
     }
 
     // Count braces for impl/trait container tracking
@@ -143,6 +308,9 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
     if (currentContainer && braceDepth <= containerBraceDepth) {
       currentContainer = undefined;
     }
+
+    // An attribute on its own line sits between a declaration and its docs
+    const doc = /^#\[.*\]\s*$/.test(trimmed) ? undefined : takeDoc();
 
     // Try each definition pattern
     for (const def of PATTERNS) {
@@ -163,23 +331,30 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
         range: new vscode.Range(i, 0, i, line.length),
         selectionRange: new vscode.Range(i, nameStart, i, nameEnd),
         container: currentContainer,
-        declaredType: def.typeGroup ? match.groups[def.typeGroup] : undefined,
+        declaredType: def.typeGroup ? baseTypeName(match.groups[def.typeGroup]) : undefined,
+        signature: signatureOf(line, def.kind),
+        doc,
       };
+      if (def.kind === R65SymbolKind.Function) {
+        const header = parseFnHeader(line);
+        sym.returnType = header?.returnType;
+        sym.hasSelf = header?.hasSelf;
+      }
       symbols.push(sym);
       break; // Only match one pattern per line
     }
 
-    // Enum header: variants may start after its `{` on this same line
-    const enumMatch = maskLineComment(line).match(ENUM_OPEN_PATTERN);
-    if (enumMatch?.groups) {
-      const enumName = enumMatch.groups.enumName;
-      const masked = maskLineComment(line);
-      const open = enumMatch.index! + enumMatch[0].length;
+    // Body header: items may start after its `{` on this same line
+    const masked = maskLineComment(line);
+    const bodyMatch = masked.match(BODY_OPEN_PATTERN);
+    if (bodyMatch?.groups) {
+      const open = bodyMatch.index! + bodyMatch[0].length;
       const close = masked.indexOf('}', open);
       const end = close < 0 ? masked.length : close;
       const body = ' '.repeat(open) + masked.substring(open, end) + ' '.repeat(masked.length - end);
-      symbols.push(...parseVariants(body, i, enumName, uri, line));
-      if (close < 0) openEnum = enumName;
+      const { keyword, bodyName } = bodyMatch.groups;
+      symbols.push(...parseBodyItems(keyword, body, i, bodyName, uri, line, undefined));
+      if (close < 0) openBody = { keyword, name: bodyName };
       continue;
     }
 
@@ -217,7 +392,7 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
     }
   }
 
-  return symbols;
+  return { symbols, lineContainers };
 }
 
 export class R65SymbolIndex implements vscode.Disposable {
@@ -226,6 +401,9 @@ export class R65SymbolIndex implements vscode.Disposable {
   // uri.toString() -> symbols in that file
   private fileSymbols: Map<string, R65Symbol[]> = new Map();
   private disposables: vscode.Disposable[] = [];
+  // Derived lookups, rebuilt on first use after any file changes
+  private traitCache: Map<string, Set<string>> | undefined;
+  private memberCache: Map<string, R65Symbol[]> | undefined;
 
   async initialize(): Promise<void> {
     const files = await vscode.workspace.findFiles('**/*.r65');
@@ -243,6 +421,7 @@ export class R65SymbolIndex implements vscode.Disposable {
     const syms = parseSymbolsFromText(text, uri);
 
     this.fileSymbols.set(uri.toString(), syms);
+    this.invalidate();
 
     for (const sym of syms) {
       const existing = this.symbols.get(sym.name);
@@ -270,25 +449,51 @@ export class R65SymbolIndex implements vscode.Disposable {
         }
       }
       this.fileSymbols.delete(key);
+      this.invalidate();
     }
+  }
+
+  private invalidate(): void {
+    this.traitCache = undefined;
+    this.memberCache = undefined;
   }
 
   lookup(name: string): R65Symbol[] {
     return this.symbols.get(name) || [];
   }
 
+  /** Every indexed symbol, across all files. */
+  allSymbols(): R65Symbol[] {
+    return ([] as R65Symbol[]).concat(...this.fileSymbols.values());
+  }
+
   /** Traits named by an `impl Trait for Type` anywhere in the workspace. */
   traitsImplementedBy(type: string): Set<string> {
-    const suffix = ` for ${type}`;
-    const traits = new Set<string>();
-    for (const syms of this.fileSymbols.values()) {
-      for (const s of syms) {
-        if (s.kind === R65SymbolKind.Impl && s.name.endsWith(suffix)) {
-          traits.add(s.name.slice(0, -suffix.length));
-        }
+    if (!this.traitCache) {
+      this.traitCache = new Map();
+      for (const s of this.allSymbols()) {
+        const m = s.kind === R65SymbolKind.Impl ? s.name.match(/^(\S+) for (\S+)$/) : null;
+        if (!m) continue;
+        const set = this.traitCache.get(m[2]) ?? new Set<string>();
+        set.add(m[1]);
+        this.traitCache.set(m[2], set);
       }
     }
-    return traits;
+    return this.traitCache.get(type) ?? new Set();
+  }
+
+  /** Symbols whose container is `name`: methods, macros, fields, variants. */
+  membersOfContainer(name: string): R65Symbol[] {
+    if (!this.memberCache) {
+      this.memberCache = new Map();
+      for (const s of this.allSymbols()) {
+        if (!s.container) continue;
+        const list = this.memberCache.get(s.container) ?? [];
+        list.push(s);
+        this.memberCache.set(s.container, list);
+      }
+    }
+    return this.memberCache.get(name) ?? [];
   }
 
   getFileSymbols(uri: vscode.Uri): R65Symbol[] {
@@ -311,5 +516,6 @@ export class R65SymbolIndex implements vscode.Disposable {
     this.disposables = [];
     this.symbols.clear();
     this.fileSymbols.clear();
+    this.invalidate();
   }
 }

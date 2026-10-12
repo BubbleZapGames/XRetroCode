@@ -21,6 +21,9 @@ export namespace workspace {
 
     export let workspaceFolders: any[] | undefined = undefined;
 
+    // Open editors' documents, for providers that prefer unsaved text
+    export const textDocuments: any[] = [];
+
     export function findFiles(include: string, _exclude?: string): Promise<Uri[]> {
         // Honour the extensions named by the glob: **/*.r65 or **/*.{sfc,smc,...}
         const braces = include.match(/\{([^}]*)\}/);
@@ -61,7 +64,7 @@ export namespace workspace {
     export function _setConfig(key: string, value: any) { _config[key] = value; }
     export function _setFileContent(path: string, content: string) { _fileContents.set(path, content); }
     export function _setWorkspaceFolders(folders: any[] | undefined) { workspaceFolders = folders; }
-    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; }
+    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; textDocuments.length = 0; }
 }
 
 export namespace tasks {
@@ -101,6 +104,18 @@ export namespace languages {
         return { dispose: () => {} };
     }
     export function registerDocumentSymbolProvider(_selector: any, _provider: any): any {
+        return { dispose: () => {} };
+    }
+    export function registerHoverProvider(_selector: any, _provider: any): any {
+        return { dispose: () => {} };
+    }
+    export function registerCompletionItemProvider(_selector: any, _provider: any, ..._triggers: string[]): any {
+        return { dispose: () => {} };
+    }
+    export function registerReferenceProvider(_selector: any, _provider: any): any {
+        return { dispose: () => {} };
+    }
+    export function registerWorkspaceSymbolProvider(_provider: any): any {
         return { dispose: () => {} };
     }
 }
@@ -230,6 +245,43 @@ export class Range {
 
 export class Location {
     constructor(public uri: Uri, public range: Range) {}
+}
+
+export class MarkdownString {
+    constructor(public value: string = '') {}
+    appendText(text: string): MarkdownString { this.value += text; return this; }
+    appendMarkdown(text: string): MarkdownString { this.value += text; return this; }
+    appendCodeblock(code: string, language = ''): MarkdownString {
+        this.value += '\n```' + language + '\n' + code + '\n```\n';
+        return this;
+    }
+}
+
+export class Hover {
+    constructor(public contents: MarkdownString, public range?: Range) {}
+}
+
+export const CompletionItemKind = {
+    Text: 0, Method: 1, Function: 2, Constructor: 3, Field: 4, Variable: 5,
+    Class: 6, Interface: 7, Module: 8, Property: 9, Unit: 10, Value: 11,
+    Enum: 12, Keyword: 13, Snippet: 14, Color: 15, File: 16, Reference: 17,
+    Folder: 18, EnumMember: 19, Constant: 20, Struct: 21, Event: 22,
+    Operator: 23, TypeParameter: 24,
+};
+
+export class CompletionItem {
+    detail?: string;
+    documentation?: MarkdownString;
+    constructor(public label: string, public kind?: number) {}
+}
+
+export class SymbolInformation {
+    constructor(
+        public name: string,
+        public kind: number,
+        public containerName: string,
+        public location: Location
+    ) {}
 }
 
 export class DocumentSymbol {

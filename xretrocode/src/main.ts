@@ -4,6 +4,10 @@ import { RomTaskProvider, TASK_TYPE } from './romTask';
 import { R65SymbolIndex } from './symbolIndex';
 import { R65DefinitionProvider } from './definitionProvider';
 import { R65DocumentSymbolProvider } from './documentSymbolProvider';
+import { R65HoverProvider } from './hoverProvider';
+import { R65CompletionProvider } from './completionProvider';
+import { R65ReferenceProvider } from './referenceProvider';
+import { R65WorkspaceSymbolProvider } from './workspaceSymbolProvider';
 import { DebugAdapterDescriptorFactory, setExtensionPath } from './debugAdapter';
 import { ConfigurationProvider } from './debugConfiguration';
 import { pickRom } from './romLocator';
@@ -16,7 +20,8 @@ export function activate(context: vscode.ExtensionContext) {
     activateDebug(context);
 }
 
-// R65 language: tasks, symbol index, go-to-definition, outline
+// R65 language: tasks, symbol index, go-to-definition, outline, hover,
+// completion, references, workspace symbols
 function activateLanguage(context: vscode.ExtensionContext) {
     taskProvider = vscode.tasks.registerTaskProvider('r65', new R65TaskProvider());
     context.subscriptions.push(taskProvider);
@@ -33,6 +38,18 @@ function activateLanguage(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.languages.registerDocumentSymbolProvider(selector, new R65DocumentSymbolProvider())
+    );
+    context.subscriptions.push(
+        vscode.languages.registerHoverProvider(selector, new R65HoverProvider(symbolIndex))
+    );
+    context.subscriptions.push(
+        vscode.languages.registerCompletionItemProvider(selector, new R65CompletionProvider(symbolIndex), '.', ':')
+    );
+    context.subscriptions.push(
+        vscode.languages.registerReferenceProvider(selector, new R65ReferenceProvider(symbolIndex))
+    );
+    context.subscriptions.push(
+        vscode.languages.registerWorkspaceSymbolProvider(new R65WorkspaceSymbolProvider(symbolIndex))
     );
 }
 

@@ -12,7 +12,7 @@ export class R65DocumentSymbolProvider implements vscode.DocumentSymbolProvider 
   }
 }
 
-function mapKind(kind: R65SymbolKind): vscode.SymbolKind {
+export function mapKind(kind: R65SymbolKind): vscode.SymbolKind {
   switch (kind) {
     case R65SymbolKind.Function: return vscode.SymbolKind.Function;
     case R65SymbolKind.Struct: return vscode.SymbolKind.Struct;
@@ -25,6 +25,7 @@ function mapKind(kind: R65SymbolKind): vscode.SymbolKind {
     case R65SymbolKind.Impl: return vscode.SymbolKind.Namespace;
     case R65SymbolKind.Union: return vscode.SymbolKind.Struct;
     case R65SymbolKind.EnumMember: return vscode.SymbolKind.EnumMember;
+    case R65SymbolKind.Field: return vscode.SymbolKind.Field;
   }
 }
 
@@ -35,6 +36,8 @@ function buildHierarchy(symbols: R65Symbol[]): vscode.DocumentSymbol[] {
   // Traits hold their declared methods, enums their variants
   const traitSymbols: Map<string, vscode.DocumentSymbol> = new Map();
   const enumSymbols: Map<string, vscode.DocumentSymbol> = new Map();
+  // Structs and unions hold their fields
+  const structSymbols: Map<string, vscode.DocumentSymbol> = new Map();
 
   // First pass: create all DocumentSymbols
   for (const sym of symbols) {
@@ -56,9 +59,11 @@ function buildHierarchy(symbols: R65Symbol[]): vscode.DocumentSymbol[] {
 
     if (sym.kind === R65SymbolKind.Trait) traitSymbols.set(sym.name, ds);
     if (sym.kind === R65SymbolKind.Enum) enumSymbols.set(sym.name, ds);
+    if (sym.kind === R65SymbolKind.Struct || sym.kind === R65SymbolKind.Union) structSymbols.set(sym.name, ds);
 
     const parent = !sym.container ? undefined
       : sym.kind === R65SymbolKind.EnumMember ? enumSymbols.get(sym.container)
+      : sym.kind === R65SymbolKind.Field ? structSymbols.get(sym.container)
       : implSymbols.get(sym.container) ?? traitSymbols.get(sym.container);
     if (parent) {
       parent.children.push(ds);
