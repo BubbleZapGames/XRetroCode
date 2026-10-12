@@ -22,6 +22,13 @@ describe('DebugAdapterDescriptorFactory', () => {
       assert.ok(result.args.includes('--dap'));
     });
 
+    it('should run headless only when the launch config asks for it', () => {
+      const windowed = factory.createDebugAdapterDescriptor({ configuration: {} } as any, undefined) as any;
+      assert.deepStrictEqual(windowed.args, ['--dap']);
+      const headless = factory.createDebugAdapterDescriptor({ configuration: { headless: true } } as any, undefined) as any;
+      assert.deepStrictEqual(headless.args, ['--dap', '--headless']);
+    });
+
     it('should use config path when set', () => {
       workspace._setConfig('xretrocode.mesenDapPath', '/custom/path/mesen-gdb');
       const result = factory.createDebugAdapterDescriptor({} as any, undefined) as any;

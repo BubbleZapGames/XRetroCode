@@ -137,6 +137,8 @@ export class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescrip
     createDebugAdapterDescriptor(session: vscode.DebugSession, executable: vscode.DebugAdapterExecutable | undefined): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         // Fall through to a bare name so a binary on PATH still works
         const mesenDapPath = locateMesenGdb(session) ?? MESEN_BINARY_NAME;
-        return new vscode.DebugAdapterExecutable(mesenDapPath, ['--dap']);
+        // Headless: no game window — for CI, remote sessions and tests
+        const args = session?.configuration?.headless ? ['--dap', '--headless'] : ['--dap'];
+        return new vscode.DebugAdapterExecutable(mesenDapPath, args);
     }
 }

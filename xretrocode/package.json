@@ -136,6 +136,11 @@
                 "description": "Path to the mesen-gdb executable (overrides the xretrocode.mesenDapPath setting).",
                 "default": ""
               },
+              "headless": {
+                "type": "boolean",
+                "description": "Run mesen-gdb without its game window (CI, remote sessions, tests).",
+                "default": false
+              },
               "dbgPath": {
                 "type": "string",
                 "description": "Path to the .dbg symbol file. Defaults to the ROM name with a .dbg extension, then <rom dir>/main.dbg.",
