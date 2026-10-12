@@ -23,7 +23,7 @@ XRetroCode enables real-time source-level debugging of retro console games throu
 ```
 
 - **mesen-dap**: Standalone C++ executable linking Mesen's Core. Runs headless (no SDL/audio). Speaks DAP over stdin/stdout.
-- **VSCode Extension** (`xretrocode-debug/`): Thin TypeScript wrapper. Launches `mesen-dap` as a subprocess, provides launch configuration schemas.
+- **VSCode Extension** (`xretrocode/`): Single TypeScript extension providing both R65 language support (syntax highlighting, go-to-definition, outline, build tasks) and the debug adapter — launches `mesen-gdb --dap` as a subprocess and provides launch configuration schemas.
 
 ## Key Design Decisions
 
@@ -54,16 +54,29 @@ Mesen-GDB/
     DapMain.cpp               — main() entry point for mesen-dap executable
 ```
 
-### VSCode Extension (in `xretrocode-debug/`)
+### VSCode Extension (in `xretrocode/`)
+
+Language support and debugging ship as one extension — the debugger's
+`contributes.breakpoints` must name the `r65` language id, so splitting them
+means a broken experience if only one half is installed.
 
 ```
-xretrocode-debug/
-  package.json                — Extension manifest with debuggers contribution point
+xretrocode/
+  package.json                — Manifest: languages, grammars, taskDefinitions,
+                                problemMatchers, debuggers, breakpoints, configuration
   tsconfig.json               — TypeScript config
+  language-configuration.json — Comments, brackets, auto-closing, indentation
+  syntaxes/
+    r65.tmLanguage.json       — TextMate grammar for .r65
   src/
-    extension.ts              — activate/deactivate, register DebugAdapterDescriptorFactory
-    debugAdapter.ts           — Factory: launches mesen-dap as subprocess
-    configuration.ts          — Launch configuration provider + snippets
+    main.ts                   — activate/deactivate; wires up both halves
+    debugAdapter.ts           — Factory: launches mesen-gdb --dap as subprocess
+    debugConfiguration.ts     — Launch configuration provider + validation
+    symbolIndex.ts            — Workspace-wide .r65 symbol index
+    definitionProvider.ts     — Go to Definition (receiver-typed disambiguation)
+    documentSymbolProvider.ts — Outline view
+    tasks.ts                  — r65c build/check task provider
+    config.ts                 — Compiler settings (r65.*)
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```
@@ -171,10 +184,10 @@ xretrocode-debug/
 cd Mesen-GDB && make dap -j$(nproc)
 
 # Build VSCode extension
-cd xretrocode-debug && npm install && npm run compile
+cd xretrocode && npm install && npm run compile
 
 # Run extension in development
-# Open xretrocode-debug/ in VSCode → press F5
+# Open xretrocode/ in VSCode → press F5
 ```
 
 ## Conventions

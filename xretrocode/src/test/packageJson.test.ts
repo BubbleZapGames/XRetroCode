@@ -11,7 +11,7 @@ describe('package.json', () => {
     });
 
     it('should have correct extension name', () => {
-        assert.strictEqual(pkg.name, 'xretrocode-r65');
+        assert.strictEqual(pkg.name, 'xretrocode');
     });
 
     it('should define r65 language', () => {
@@ -56,6 +56,83 @@ describe('package.json', () => {
         assert.ok(props['r65.targetPlatform'].enum.includes('nes'));
         assert.ok(props['r65.includePaths']);
         assert.ok(props['r65.cfgOptions']);
+    });
+
+    it('should define a debugger contribution', () => {
+        assert.ok(pkg.contributes.debuggers);
+        assert.strictEqual(pkg.contributes.debuggers.length, 1);
+        assert.strictEqual(pkg.contributes.debuggers[0].type, 'xretrocode');
+    });
+
+    it('should define romPath without forcing it up front', () => {
+        const launch = pkg.contributes.debuggers[0].configurationAttributes.launch;
+        assert.strictEqual(launch.properties.romPath.type, 'string');
+        // The provider resolves a ROM when it is absent, so marking it required
+        // would block F5 before that code ever runs.
+        assert.ok(!launch.required.includes('romPath'));
+    });
+
+    it('should define dbgPath so it gets completion in launch.json', () => {
+        const props = pkg.contributes.debuggers[0].configurationAttributes.launch.properties;
+        assert.ok(props.dbgPath);
+        assert.strictEqual(props.dbgPath.type, 'string');
+    });
+
+    it('should contribute the pickRom command', () => {
+        assert.ok(pkg.contributes.commands);
+        assert.ok(pkg.contributes.commands.some((c: any) => c.command === 'xretrocode.pickRom'));
+    });
+
+    it('should default romPath to the pickRom command', () => {
+        const initial = pkg.contributes.debuggers[0].initialConfigurations[0];
+        assert.strictEqual(initial.romPath, '${command:xretrocode.pickRom}');
+    });
+
+    it('should define stopOnEntry as boolean defaulting to true', () => {
+        const props = pkg.contributes.debuggers[0].configurationAttributes.launch.properties;
+        assert.strictEqual(props.stopOnEntry.type, 'boolean');
+        assert.strictEqual(props.stopOnEntry.default, true);
+    });
+
+    it('should define mesenDapPath as an optional string', () => {
+        const props = pkg.contributes.debuggers[0].configurationAttributes.launch.properties;
+        assert.ok(props.mesenDapPath);
+        assert.strictEqual(props.mesenDapPath.type, 'string');
+    });
+
+    it('should have an initial debug configuration', () => {
+        const initial = pkg.contributes.debuggers[0].initialConfigurations;
+        assert.ok(initial && initial.length > 0);
+        assert.strictEqual(initial[0].type, 'xretrocode');
+        assert.strictEqual(initial[0].request, 'launch');
+    });
+
+    it('should carry configurationSnippets inside the debugger contribution', () => {
+        // As a top-level contributes key VSCode silently ignores it
+        assert.ok(pkg.contributes.debuggers[0].configurationSnippets);
+        assert.strictEqual(pkg.contributes.configurationSnippets, undefined);
+    });
+
+    it('should allow breakpoints in r65 files', () => {
+        // Without this VSCode refuses to place breakpoints in the gutter
+        assert.ok(pkg.contributes.breakpoints);
+        assert.ok(pkg.contributes.breakpoints.some((b: any) => b.language === 'r65'));
+    });
+
+    it('should define the xretrocode.mesenDapPath setting', () => {
+        const props = pkg.contributes.configuration.properties;
+        assert.ok(props['xretrocode.mesenDapPath']);
+        assert.strictEqual(props['xretrocode.mesenDapPath'].type, 'string');
+    });
+
+    it('should activate for both r65 files and xretrocode debug sessions', () => {
+        assert.ok(pkg.activationEvents.includes('onLanguage:r65'));
+        assert.ok(pkg.activationEvents.includes('debug: xretrocode'));
+    });
+
+    it('should declare both language and debugger categories', () => {
+        assert.ok(pkg.categories.includes('Programming Languages'));
+        assert.ok(pkg.categories.includes('Debuggers'));
     });
 
     it('should have compile and test scripts', () => {

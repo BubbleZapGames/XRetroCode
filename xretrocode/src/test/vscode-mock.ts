@@ -8,21 +8,37 @@ export namespace workspace {
             get<T>(key: string, defaultValue?: T): T | undefined {
                 const val = _config[`${section}.${key}`];
                 return val !== undefined ? val as T : defaultValue;
+            },
+            update(key: string, value: any, _target?: any): Promise<void> {
+                _config[`${section}.${key}`] = value;
+                _updates.push({ key: `${section}.${key}`, value, target: _target });
+                return Promise.resolve();
             }
         };
     }
 
-    export const workspaceFolders: any[] | undefined = undefined;
+    export const _updates: { key: string; value: any; target: any }[] = [];
+
+    export let workspaceFolders: any[] | undefined = undefined;
 
     export function findFiles(include: string, _exclude?: string): Promise<Uri[]> {
-        // Return URIs for all files set via _setFileContent
+        // Honour the extensions named by the glob: **/*.r65 or **/*.{sfc,smc,...}
+        const braces = include.match(/\{([^}]*)\}/);
+        const exts = braces
+            ? braces[1].split(',').map(e => '.' + e.trim())
+            : [include.substring(include.lastIndexOf('.'))];
         const uris: Uri[] = [];
         for (const path of _fileContents.keys()) {
-            if (path.endsWith('.r65')) {
+            if (exts.some(e => path.endsWith(e))) {
                 uris.push(Uri.file(path));
             }
         }
         return Promise.resolve(uris);
+    }
+
+    export function asRelativePath(uri: any): string {
+        const p = typeof uri === 'string' ? uri : (uri.fsPath || uri.path);
+        return p.replace(/^\/test\//, '');
     }
 
     export function createFileSystemWatcher(_glob: string): any {
@@ -44,13 +60,40 @@ export namespace workspace {
 
     export function _setConfig(key: string, value: any) { _config[key] = value; }
     export function _setFileContent(path: string, content: string) { _fileContents.set(path, content); }
-    export function _reset() { _config = {}; _fileContents.clear(); }
+    export function _setWorkspaceFolders(folders: any[] | undefined) { workspaceFolders = folders; }
+    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; }
 }
 
 export namespace tasks {
+    let _endHandlers: ((event: any) => void)[] = [];
+    let _exitCode: number | undefined = 0;
+
+    export const _executed: any[] = [];
+
     export function registerTaskProvider(type: string, provider: any): any {
         return { dispose: () => {} };
     }
+
+    export function executeTask(task: any): Promise<any> {
+        const execution = { task };
+        _executed.push(task);
+        // The real API reports completion later; a macrotask keeps the caller's
+        // onDidEndTaskProcess subscription ahead of the event.
+        setTimeout(() => {
+            for(const handler of [..._endHandlers]) {
+                handler({ execution, exitCode: _exitCode });
+            }
+        }, 0);
+        return Promise.resolve(execution);
+    }
+
+    export function onDidEndTaskProcess(handler: (event: any) => void): any {
+        _endHandlers.push(handler);
+        return { dispose: () => { _endHandlers = _endHandlers.filter(h => h !== handler); } };
+    }
+
+    export function _setExitCode(code: number | undefined) { _exitCode = code; }
+    export function _reset() { _endHandlers = []; _executed.length = 0; _exitCode = 0; }
 }
 
 export namespace languages {
@@ -63,8 +106,82 @@ export namespace languages {
 }
 
 export namespace window {
-    export function showErrorMessage(msg: string) { return Promise.resolve(undefined); }
+    export const _messages: string[] = [];
+
+    let _errorChoice: any = undefined;
+
+    export function showErrorMessage(msg: string, ..._items: any[]) {
+        _messages.push(msg);
+        return Promise.resolve(_errorChoice);
+    }
+
+    export function _setErrorMessageChoice(choice: any) { _errorChoice = choice; }
     export function showInformationMessage(msg: string) { return Promise.resolve(undefined); }
+
+    // Scripted responses for the ROM picker
+    let _quickPickResult: any = undefined;
+    let _openDialogResult: any[] | undefined = undefined;
+    export const _quickPickCalls: any[][] = [];
+    export const _openDialogCalls: any[] = [];
+
+    export function showQuickPick(items: any[], _options?: any): Promise<any> {
+        _quickPickCalls.push(items);
+        return Promise.resolve(_quickPickResult);
+    }
+
+    export function showOpenDialog(options?: any): Promise<any[] | undefined> {
+        _openDialogCalls.push(options);
+        return Promise.resolve(_openDialogResult);
+    }
+
+    export function _setQuickPickResult(result: any) { _quickPickResult = result; }
+    export function _setOpenDialogResult(result: any[] | undefined) { _openDialogResult = result; }
+
+    export function _reset() {
+        _messages.length = 0;
+        _errorChoice = undefined;
+        _quickPickResult = undefined;
+        _openDialogResult = undefined;
+        _quickPickCalls.length = 0;
+        _openDialogCalls.length = 0;
+    }
+}
+
+export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 };
+
+export namespace commands {
+    export const _registered: string[] = [];
+    export function registerCommand(id: string, _handler: any): any {
+        _registered.push(id);
+        return { dispose: () => {} };
+    }
+}
+
+export namespace debug {
+    export function registerDebugAdapterDescriptorFactory(_type: string, _factory: any): any {
+        return { dispose: () => {} };
+    }
+    export function registerDebugConfigurationProvider(_type: string, _provider: any): any {
+        return { dispose: () => {} };
+    }
+}
+
+export class DebugAdapterExecutable {
+    constructor(public command: string, public args?: string[]) {}
+}
+
+export type DebugAdapterDescriptor = any;
+export type DebugSession = any;
+export type DebugConfiguration = Record<string, any>;
+export type WorkspaceFolder = { uri: { fsPath: string } };
+
+export interface DebugAdapterDescriptorFactory {
+    createDebugAdapterDescriptor(session: any, executable: any): any;
+}
+
+export interface DebugConfigurationProvider {
+    provideDebugConfigurations?(folder: any, token?: any): any;
+    resolveDebugConfiguration?(folder: any, config: any, token?: any): any;
 }
 
 export class Uri {
@@ -144,7 +261,11 @@ export class Disposable {
 }
 
 export class ShellExecution {
-    constructor(public command: string, public args?: string[]) {}
+    constructor(
+        public command: string,
+        public args?: string[],
+        public options?: { cwd?: string }
+    ) {}
 }
 
 export class Task {

@@ -19,12 +19,15 @@ export interface R65Symbol {
   range: vscode.Range;
   selectionRange: vscode.Range;
   container?: string;
+  /** For const/static: the declared type name, used to resolve method receivers. */
+  declaredType?: string;
 }
 
 interface PatternDef {
   pattern: RegExp;
   kind: R65SymbolKind;
   nameGroup: string;
+  typeGroup?: string;
 }
 
 const PATTERNS: PatternDef[] = [
@@ -33,8 +36,8 @@ const PATTERNS: PatternDef[] = [
   { pattern: /\benum\s+(?<enum_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Enum, nameGroup: 'enum_name' },
   { pattern: /\btrait\s+(?<trait_name>[A-Z][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Trait, nameGroup: 'trait_name' },
   { pattern: /\btype\s+(?<type_name>[A-Z][a-zA-Z0-9_]*)\s*=/, kind: R65SymbolKind.TypeAlias, nameGroup: 'type_name' },
-  { pattern: /\bconst\s+(?!fn\b)(?<const_name>[A-Z_][A-Z0-9_]*)\s*:/, kind: R65SymbolKind.Constant, nameGroup: 'const_name' },
-  { pattern: /\bstatic\s+(?:mut\s+)?(?<static_name>[A-Z_][A-Z0-9_]*)\s*:/, kind: R65SymbolKind.Static, nameGroup: 'static_name' },
+  { pattern: /\bconst\s+(?!fn\b)(?<const_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\[?\s*(?<const_type>[a-zA-Z_][a-zA-Z0-9_]*)?/, kind: R65SymbolKind.Constant, nameGroup: 'const_name', typeGroup: 'const_type' },
+  { pattern: /\bstatic\s+(?:mut\s+)?(?<static_name>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*\[?\s*(?<static_type>[a-zA-Z_][a-zA-Z0-9_]*)?/, kind: R65SymbolKind.Static, nameGroup: 'static_name', typeGroup: 'static_type' },
   { pattern: /\bmacro_rules!\s*(?<macro_name>[a-zA-Z_][a-zA-Z0-9_]*)/, kind: R65SymbolKind.Macro, nameGroup: 'macro_name' },
 ];
 
@@ -101,6 +104,7 @@ export function parseSymbolsFromText(text: string, uri: vscode.Uri): R65Symbol[]
         range: new vscode.Range(i, 0, i, line.length),
         selectionRange: new vscode.Range(i, nameStart, i, nameEnd),
         container: currentContainer,
+        declaredType: def.typeGroup ? match.groups[def.typeGroup] : undefined,
       };
       symbols.push(sym);
       break; // Only match one pattern per line

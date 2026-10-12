@@ -127,6 +127,40 @@ describe('Symbol Parsing', () => {
     assert.strictEqual(sym.kind, R65SymbolKind.Static);
   });
 
+  it('should parse lowercase static mut definition', () => {
+    // Most globals in real R65 sources are snake_case, not SCREAMING_CASE
+    const syms = parse('static mut enemy_free: u8;');
+    const sym = findByName(syms, 'enemy_free');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Static);
+  });
+
+  it('should parse lowercase static without mut', () => {
+    const syms = parse('static back1_gfx: [u8; 32] = [0];');
+    const sym = findByName(syms, 'back1_gfx');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Static);
+  });
+
+  it('should parse mixedCase static', () => {
+    const syms = parse('static mut spriteTable: u8;');
+    assert.ok(findByName(syms, 'spriteTable'));
+  });
+
+  it('should parse lowercase const definition', () => {
+    const syms = parse('const tile_width: u8 = 8;');
+    const sym = findByName(syms, 'tile_width');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Constant);
+  });
+
+  it('should not treat a static named like a keyword prefix as a fn', () => {
+    const syms = parse('static mut fn_table: u8;');
+    const sym = findByName(syms, 'fn_table');
+    assert.ok(sym);
+    assert.strictEqual(sym.kind, R65SymbolKind.Static);
+  });
+
   it('should parse macro_rules definition', () => {
     const syms = parse('macro_rules! set_bg($x:expr) {');
     const sym = findByName(syms, 'set_bg');
@@ -288,6 +322,146 @@ describe('Definition Provider', () => {
     const result = provider.provideDefinition(doc, new Position(0, 10) as any, { isCancellationRequested: false } as any);
     assert.strictEqual(result, undefined);
     index.dispose();
+  });
+
+  it('should go to definition of a lowercase static variable', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/enemy.r65', [
+      '#[lowram]',
+      'static mut enemy_free: u8;',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/enemy.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('enemy_free = 1;', '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 3) as any, { isCancellationRequested: false } as any);
+    assert.ok(result, 'expected a definition for a snake_case static');
+    assert.strictEqual((result as any).range.start.line, 1);
+    index.dispose();
+  });
+
+  it('should disambiguate same-named methods by receiver type', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'impl OamEntry {',
+      '    macro_rules! set($x:expr, $y:expr) {',
+      '    }',
+      '}',
+      '',
+      'impl OamBuffer {',
+      '    macro_rules! set($idx:expr, $sx:expr) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    workspace._setFileContent('/test/game.r65', 'static mut oam_buffer: OamBuffer;');
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+    await index.indexFile(Uri.file('/test/game.r65') as any);
+
+    assert.strictEqual(index.lookup('set').length, 2, 'both impls should be indexed');
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('    oam_buffer.set!(spr, ox);', '/test/enemy.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 17) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result), 'expected exactly one definition, not a picker');
+    assert.strictEqual((result as any).range.start.line, 6, 'should land on the OamBuffer impl');
+  });
+
+  it('should resolve a receiver typed by a local let binding', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'impl OamEntry {',
+      '    macro_rules! set($x:expr) {',
+      '    }',
+      '}',
+      'impl OamBuffer {',
+      '    macro_rules! set($i:expr) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument([
+      'fn draw() {',
+      '    let mut e: OamEntry = oam[0];',
+      '    e.set!(1);',
+    ].join('\n'), '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(2, 7) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 1, 'should land on the OamEntry impl');
+  });
+
+  it('should resolve self. to the enclosing impl', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'impl OamEntry {',
+      '    macro_rules! set($x:expr) {',
+      '    }',
+      '}',
+      'impl OamBuffer {',
+      '    macro_rules! set($i:expr) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument([
+      'impl OamBuffer {',
+      '    fn clear(far *self) {',
+      '        self.set!(0);',
+      '    }',
+      '}',
+    ].join('\n'), '/test/lib2.r65');
+    const result = provider.provideDefinition(doc, new Position(2, 14) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 5, 'should land on the OamBuffer impl');
+  });
+
+  it('should keep every candidate when the receiver type is unknown', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'impl OamEntry {',
+      '    macro_rules! set($x:expr) {',
+      '    }',
+      '}',
+      'impl OamBuffer {',
+      '    macro_rules! set($i:expr) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('    mystery.set!(1);', '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 13) as any, { isCancellationRequested: false } as any);
+    assert.ok(Array.isArray(result), 'should not guess when the type is unresolvable');
+    assert.strictEqual((result as any[]).length, 2);
+  });
+
+  it('should prefer a free function over a method when there is no receiver', async () => {
+    workspace._reset();
+    workspace._setFileContent('/test/lib.r65', [
+      'fn update() {',
+      '}',
+      'impl OamBuffer {',
+      '    fn update(far *self) {',
+      '    }',
+      '}',
+    ].join('\n'));
+    const index = new R65SymbolIndex();
+    await index.indexFile(Uri.file('/test/lib.r65') as any);
+
+    const provider = new R65DefinitionProvider(index);
+    const doc = createMockDocument('    update();', '/test/caller.r65');
+    const result = provider.provideDefinition(doc, new Position(0, 6) as any, { isCancellationRequested: false } as any);
+    assert.ok(result && !Array.isArray(result));
+    assert.strictEqual((result as any).range.start.line, 0);
   });
 
   it('should return multiple locations for overloaded names', async () => {
