@@ -83,6 +83,8 @@ xretrocode/
     workspaceSymbolProvider.ts — Ctrl+T symbol search
     tasks.ts                  — r65c build/check task provider
     config.ts                 — Compiler settings (r65.*)
+    e2e/                      — Real VS Code + mesen-gdb: breakpoint on Mesen-GDB's
+                                green test ROM (npm run test:e2e)
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```
@@ -191,6 +193,13 @@ cd Mesen-GDB && make dap -j$(nproc)
 
 # Build VSCode extension
 cd xretrocode && npm install && npm run compile
+
+# Extension unit tests (mocked vscode API)
+cd xretrocode && npm test
+
+# Extension e2e tests: real VS Code + mesen-gdb (needs `make` in Mesen-GDB).
+# VSCODE_EXECUTABLE=/usr/share/code/code skips downloading VS Code into .vscode-test/
+cd xretrocode && xvfb-run -a npm run test:e2e
 
 # Run extension in development
 # Open xretrocode/ in VSCode → press F5
