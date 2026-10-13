@@ -127,7 +127,17 @@ describe('package.json', () => {
 
     it('should activate for both r65 files and xretrocode debug sessions', () => {
         assert.ok(pkg.activationEvents.includes('onLanguage:r65'));
-        assert.ok(pkg.activationEvents.includes('debug: xretrocode'));
+        // Starting a session, and VS Code asking for launch.json's first configurations
+        assert.ok(pkg.activationEvents.includes('onDebugResolve:xretrocode'));
+        assert.ok(pkg.activationEvents.includes('onDebugInitialConfigurations'));
+    });
+
+    it('should only use activation events VS Code recognises', () => {
+        // A malformed event (e.g. "debug: xretrocode") is silently ignored
+        const known = /^(onLanguage|workspaceContains|onDebugResolve|onCommand):\S+$|^onDebugInitialConfigurations$/;
+        for (const event of pkg.activationEvents) {
+            assert.ok(known.test(event), `unrecognised activation event: ${event}`);
+        }
     });
 
     it('should declare both language and debugger categories', () => {

@@ -14,7 +14,8 @@
   "activationEvents": [
     "onLanguage:r65",
     "workspaceContains:**/*.r65",
-    "debug: xretrocode"
+    "onDebugResolve:xretrocode",
+    "onDebugInitialConfigurations"
   ],
   "main": "./out/main.js",
   "contributes": {
