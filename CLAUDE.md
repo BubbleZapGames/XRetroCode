@@ -83,8 +83,10 @@ xretrocode/
     workspaceSymbolProvider.ts — Ctrl+T symbol search
     tasks.ts                  — r65c build/check task provider
     config.ts                 — Compiler settings (r65.*)
-    e2e/                      — Real VS Code + mesen-gdb: breakpoint on Mesen-GDB's
-                                green test ROM (npm run test:e2e)
+    e2e/                      — Real VS Code + mesen-gdb on Mesen-GDB's green test ROM
+                                (npm run test:e2e): breakpoints, stepping, pause and
+                                inspection, launch path, lifecycle; knownIssues.e2e.ts
+                                holds skipped tests for adapter bugs
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```
