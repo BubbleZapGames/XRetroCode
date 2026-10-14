@@ -1,7 +1,7 @@
 # XRetroCode
 
 Source-level debugging of retro console games in VS Code, plus language support
-for the R65 compiler.
+for the [R65](https://github.com/BubbleZapGames/R65) compiler.
 
 XRetroCode is a VS Code extension (`xretrocode/`) that drives
 [Mesen-GDB](https://github.com/BubbleZapGames/Mesen-GDB) over the Debug Adapter
