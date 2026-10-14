@@ -21,9 +21,9 @@ jobs:
         working-directory: xretrocode
     steps:
       # No submodules: packaging and the unit tests don't need Mesen-GDB
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -49,7 +49,7 @@ jobs:
       - name: Package
         run: npm run package
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: xretrocode-vsix
           path: xretrocode/*.vsix
@@ -61,7 +61,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: xretrocode-vsix
           path: dist
