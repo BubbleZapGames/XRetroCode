@@ -77,13 +77,20 @@ The extension looks for `mesen-gdb` in this order:
 If none of these turns up a binary, the extension offers to download one or
 lets you browse for it. It remembers the binary you pick.
 
-### 2. Build the extension
+### 2. Install the extension
+
+Package it as a `.vsix` and install that:
 
 ```bash
 cd xretrocode
 npm install
-npm run compile
+npm run package                                # → xretrocode-0.0.1.vsix
+code --install-extension xretrocode-0.0.1.vsix
 ```
+
+You can also install it from the Extensions view: open the `...` menu and
+choose **Install from VSIX...**. The package doesn't include `mesen-gdb`.
+Install that separately, as described in step 1.
 
 To run the extension in development, open `xretrocode/` in VS Code and press F5.
 

@@ -4,6 +4,12 @@
   "description": "R65 language support and Mesen-GDB source-level debugging for retro console development",
   "version": "0.0.1",
   "publisher": "XRetroCode",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BubbleZapGames/XRetroCode",
+    "directory": "xretrocode"
+  },
   "engines": {
     "vscode": "^1.70.0"
   },
@@ -230,6 +236,8 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile && node -e \"for (const f of ['README.md', 'LICENSE']) require('fs').copyFileSync('../' + f, f)\"",
+    "package": "vsce package --no-dependencies --baseContentUrl https://github.com/BubbleZapGames/XRetroCode/blob/main --baseImagesUrl https://github.com/BubbleZapGames/XRetroCode/raw/main",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
@@ -241,6 +249,7 @@
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.70.0",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.9.2",
     "mocha": "^11.7.5",
     "typescript": "^4.9.0",
     "vscode-oniguruma": "^2.0.0",
