@@ -29,6 +29,8 @@ export interface R65Symbol {
    * For an EnumMember: the payload struct, so a binding like `Shape::Circle(c)` types `c`.
    */
   declaredType?: string;
+  /** For const/static/field: its type as written, pattern-side pointer folded in (see `declTypeText`). */
+  typeText?: string;
   /** For a Function: its single non-primitive return type, if any. */
   returnType?: string;
   /** For a Function: whether it takes `self` (a method rather than an associated fn). */
@@ -115,12 +117,67 @@ export function baseTypeName(text: string | undefined): string | undefined {
   return m[0];
 }
 
+/**
+ * The type a declaration gives its name, with a pattern-side pointer moved
+ * onto the type: `far *src: u8` → `far *u8`, `src: [u8; 4]` → `[u8; 4]`.
+ */
+export function declTypeText(decl: string): string | undefined {
+  const colon = decl.indexOf(':');
+  if (colon < 0) return undefined;
+  const type = decl.substring(colon + 1).trim();
+  const pattern = decl.substring(0, colon).match(
+    /(?:\b(far|near)\s+)?(?:mut\s+)?(\*)?\s*[a-zA-Z_][a-zA-Z0-9_]*\s*(?:@\s*[a-zA-Z_][a-zA-Z0-9_]*\s*)?$/
+  );
+  if (!pattern?.[2]) return type;
+  return `${pattern[1] === 'far' ? 'far ' : ''}*${type}`;
+}
+
+/** What a type expression supports beyond its struct members: the compiler's intrinsic methods. */
+export enum ValueShape {
+  /** `far *T`: `bank_byte()` */
+  FarPointer,
+  /** `[T; N]`: `len()` */
+  Array,
+  /** `u8`, `i8`, `u16`, `i16`: `rotate_left(n)`, `rotate_right(n)` */
+  Integer,
+}
+
+export function valueShape(typeText: string | undefined): ValueShape | undefined {
+  const t = typeText?.trim();
+  if (!t) return undefined;
+  if (/^far\s*\*/.test(t)) return ValueShape.FarPointer;
+  if (t.startsWith('[')) return ValueShape.Array;
+  if (/^(?:u8|i8|u16|i16)\b/.test(t)) return ValueShape.Integer;
+  return undefined;
+}
+
+/**
+ * The type one index or deref away: `[T; N]` → `T`, `*T` / `far *T` → `T`.
+ * Undefined for anything else.
+ */
+export function elementTypeText(typeText: string): string | undefined {
+  const t = typeText.trim();
+  const ptr = t.match(/^(?:(?:far|near)\s*)?\*\s*([\s\S]*)$/);
+  if (ptr) return ptr[1];
+  if (!t.startsWith('[')) return undefined;
+  let depth = 0;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '[' || ch === '(') depth++;
+    else if (ch === ']' || ch === ')') depth--;
+    else if (ch === ';' && depth === 1) return t.substring(1, i);
+  }
+  return undefined;
+}
+
 export interface FnParam {
   name: string;
   /** Reduced type name; undefined for `self` and primitives. */
   type?: string;
   /** The parameter as written, e.g. `src: far *u8`. */
   text: string;
+  /** Its type as written, pattern-side pointer folded in (see `declTypeText`). */
+  typeText?: string;
 }
 
 export interface FnHeader {
@@ -156,7 +213,7 @@ export function parseFnHeader(line: string): FnHeader | undefined {
       continue;
     }
     const p = item.match(PARAM);
-    if (p) params.push({ name: p[1], type: baseTypeName(p[2]), text: item });
+    if (p) params.push({ name: p[1], type: baseTypeName(p[2]), text: item, typeText: declTypeText(item) });
   }
   const ret = depth === 0 ? line.substring(i).match(/^\s*->\s*([^{;]*)/) : null;
   return {
@@ -210,6 +267,7 @@ function parseBodyItems(
       selectionRange: new vscode.Range(line, nameStart, line, nameStart + name.length),
       container,
       declaredType: isEnum ? payload : baseTypeName(m.groups!.type),
+      typeText: isEnum ? undefined : declTypeText(m.groups!.item),
       signature: isEnum
         ? `${container}::${name}${payload ? `(${payload})` : ''}`
         : m.groups!.item.trim(),
@@ -332,6 +390,7 @@ export function scanText(text: string, uri: vscode.Uri): ScanResult {
         selectionRange: new vscode.Range(i, nameStart, i, nameEnd),
         container: currentContainer,
         declaredType: def.typeGroup ? baseTypeName(match.groups[def.typeGroup]) : undefined,
+        typeText: def.typeGroup ? declTypeText(match[0]) : undefined,
         signature: signatureOf(line, def.kind),
         doc,
       };

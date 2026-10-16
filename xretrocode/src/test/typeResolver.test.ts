@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { Uri, Position, SymbolKind, workspace } from './vscode-mock';
 import {
-  baseTypeName, parseFnHeader, parseSymbolsFromText, R65SymbolIndex, R65SymbolKind,
+  baseTypeName, declTypeText, elementTypeText, parseFnHeader, ValueShape, valueShape, parseSymbolsFromText, R65SymbolIndex, R65SymbolKind,
 } from '../symbolIndex';
 import { R65DefinitionProvider } from '../definitionProvider';
 import { R65DocumentSymbolProvider } from '../documentSymbolProvider';
@@ -44,6 +44,33 @@ describe('baseTypeName', () => {
     assert.strictEqual(baseTypeName('!'), undefined);
     assert.strictEqual(baseTypeName('fn(u8) -> u8'), undefined);
     assert.strictEqual(baseTypeName('u8, u16'), undefined);
+  });
+});
+
+describe('declTypeText and valueShape', () => {
+  it('should fold a pattern-side pointer onto the type', () => {
+    assert.strictEqual(declTypeText('src: far *u8'), 'far *u8');
+    assert.strictEqual(declTypeText('far *src: u8'), 'far *u8');
+    assert.strictEqual(declTypeText('let far mut *p: u8'), 'far *u8');
+    assert.strictEqual(declTypeText('*src: u8'), '*u8');
+    assert.strictEqual(declTypeText('channel @ A: u8'), 'u8');
+    assert.strictEqual(declTypeText('far *self'), undefined);
+  });
+
+  it('should classify by the outermost type only', () => {
+    assert.strictEqual(valueShape('far *u8'), ValueShape.FarPointer);
+    assert.strictEqual(valueShape('[far *u8; 4]'), ValueShape.Array);
+    assert.strictEqual(valueShape('i16'), ValueShape.Integer);
+    for (const t of ['*u8', 'near *u8', '*far *u8', 'bool', 'Q10', 'u8x']) {
+      assert.strictEqual(valueShape(t), undefined, t);
+    }
+  });
+
+  it('should peel one array or pointer level', () => {
+    assert.strictEqual(elementTypeText('[far *u8; 4]'), 'far *u8');
+    assert.strictEqual(elementTypeText('[[u8; 4]; 2]'), '[u8; 4]');
+    assert.strictEqual(elementTypeText('far *[u8; 4]'), '[u8; 4]');
+    assert.strictEqual(elementTypeText('u8'), undefined);
   });
 });
 

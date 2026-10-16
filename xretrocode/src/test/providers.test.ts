@@ -99,10 +99,62 @@ describe('Completion', () => {
   it('should offer fields, methods and method macros after a typed receiver', async () => {
     const index = await indexed({ '/test/lib.r65': LIB });
     const items = complete(index, 'fn f(e: far *OamEntry) {\n    e.');
-    assert.deepStrictEqual(labels(items).sort(), ['move_to', 'set!', 'tile', 'x', 'y']);
+    assert.deepStrictEqual(labels(items).sort(), ['bank_byte', 'move_to', 'set!', 'tile', 'x', 'y']);
     const tile = items!.find(i => i.label === 'tile');
     assert.strictEqual(tile.kind, CompletionItemKind.Field);
     assert.strictEqual(tile.detail, 'tile: u8');
+  });
+
+  it('should offer bank_byte() on far pointers only', async () => {
+    const index = await indexed({
+      '/test/lib.r65': LIB,
+      '/test/dma.r65': [
+        'struct Dma { src: far *u8, near_src: *u8, srcs: [far *u8; 4] }',
+        'static mut BUF_PTR: far *u8;',
+      ].join('\n'),
+    });
+    const bank = (content: string) => labels(complete(index, content)).includes('bank_byte');
+
+    assert.deepStrictEqual(labels(complete(index, 'fn f(src: far *u8) {\n    src.')), ['bank_byte']);
+    const item = complete(index, 'fn f(src: far *u8) {\n    src.')![0];
+    assert.strictEqual(item.kind, CompletionItemKind.Method);
+    assert.strictEqual(item.insertText, 'bank_byte()');
+    assert.ok(bank('fn f() {\n    let mut q: far *u8 = 0;\n    q.'), 'type-side let');
+    assert.ok(bank('fn f() {\n    let far *q: u8 = 0;\n    q.'), 'pattern-side let');
+    assert.ok(bank('fn f(d: *Dma) {\n    d.src.'), 'far pointer field');
+    assert.ok(bank('fn f() {\n    BUF_PTR.'), 'far pointer static');
+
+    assert.ok(!bank('fn f(p: *OamEntry) {\n    p.'), 'near pointer');
+    assert.strictEqual(complete(index, 'fn f(d: *Dma) {\n    d.near_src.'), undefined);
+    assert.ok(!bank('fn f(d: *Dma) {\n    d.srcs.'), 'array of far pointers');
+    assert.ok(!bank('fn f(e: far *OamEntry) {\n    (*e).'), 'dereferenced');
+    assert.ok(!bank('fn f(e: far *OamEntry) {\n    e[0].'), 'indexed');
+  });
+
+  it('should offer len() on arrays and the rotates on integers', async () => {
+    const index = await indexed({
+      '/test/lib.r65': LIB,
+      '/test/buf.r65': [
+        'struct Buf { data: [u8; 16], rows: [[u8; 4]; 2], count: u16 }',
+        'static BUFFER: [u8; 256];',
+      ].join('\n'),
+    });
+    const of = (content: string) => labels(complete(index, content)).sort();
+
+    assert.deepStrictEqual(of('fn f() {\n    BUFFER.'), ['len']);
+    assert.deepStrictEqual(of('fn f(b: *Buf) {\n    b.data.'), ['len']);
+    assert.deepStrictEqual(of('fn f(b: *Buf) {\n    b.rows[0].'), ['len'], 'inner array');
+    assert.deepStrictEqual(of('fn f(b: *Buf) {\n    b.count.'), ['rotate_left', 'rotate_right']);
+    assert.deepStrictEqual(of('fn f(b: *Buf, i: u8) {\n    b.data[i].'), ['rotate_left', 'rotate_right'], 'element');
+    assert.deepStrictEqual(of('fn f(x: i8) {\n    x.'), ['rotate_left', 'rotate_right']);
+    assert.deepStrictEqual(of('fn f() {\n    let mut v: u16 = 0;\n    v.'), ['rotate_left', 'rotate_right']);
+    assert.deepStrictEqual(of('fn f(p: *u8) {\n    (*p).'), ['rotate_left', 'rotate_right'], 'deref');
+    const rot = complete(index, 'fn f(x: u8) {\n    x.')!.find(i => i.label === 'rotate_left');
+    assert.strictEqual(rot.insertText, 'rotate_left(1)');
+
+    assert.strictEqual(complete(index, 'fn f(p: *u8) {\n    p.'), undefined, 'near pointer');
+    assert.strictEqual(complete(index, 'fn f(ok: bool) {\n    ok.'), undefined, 'bool');
+    assert.strictEqual(complete(index, 'fn f(p: *[u8; 4]) {\n    p.'), undefined, 'pointer to array');
   });
 
   it('should leave an unknown receiver to word-based suggestions', async () => {

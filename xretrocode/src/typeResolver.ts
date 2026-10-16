@@ -1,4 +1,7 @@
-import { R65Symbol, R65SymbolIndex, R65SymbolKind, baseTypeName, parseFnHeader } from './symbolIndex';
+import {
+  R65Symbol, R65SymbolIndex, R65SymbolKind, ValueShape, baseTypeName, declTypeText, elementTypeText,
+  parseFnHeader, valueShape,
+} from './symbolIndex';
 
 /** The slice of a TextDocument the resolver reads; files off disk satisfy it too. */
 export interface LineSource {
@@ -19,6 +22,16 @@ export interface Binding {
   type?: string;
   /** The binding as written, e.g. `let mut p: *OamEntry` or `src: far *u8`. */
   decl: string;
+  /** The type as written, pattern-side pointer folded in, e.g. `far *u8`. */
+  typeText?: string;
+}
+
+/** What a receiver chain evaluates to. */
+export interface Receiver {
+  /** Reduced type name; undefined for primitives. */
+  type?: string;
+  /** Which compiler intrinsics the value itself takes, if any. */
+  shape?: ValueShape;
 }
 
 const IDENT = '[a-zA-Z_][a-zA-Z0-9_]*';
@@ -144,32 +157,50 @@ export class R65Resolver {
 
   /** Type of the receiver chain that `before` (text up to the cursor word) ends with. */
   receiverType(src: LineSource, line: number, before: string): string | undefined {
+    return this.receiver(src, line, before)?.type;
+  }
+
+  /** The receiver chain that `before` ends with: its type and the intrinsics it takes. */
+  receiver(src: LineSource, line: number, before: string): Receiver | undefined {
     const m = before.match(CHAIN_RE);
     if (!m?.groups) return undefined;
     const g = m.groups;
 
     let type: string | undefined;
+    // The last segment's written type; each `(*p)` or trailing `[i]` peels a level
+    let typeText: string | undefined;
+    let peel = (before.match(/((?:\s*\[[^\]]*\])*)\s*\.\s*$/)![1].match(/\[/g) ?? []).length;
     if (g.deref) {
-      type = this.bindingAt(src, line, g.deref)?.type;
+      const binding = this.bindingAt(src, line, g.deref);
+      type = binding?.type;
+      typeText = binding?.typeText;
+      if (!g.fields) peel++;
     } else if (g.pathType) {
       type = this.definitionMembers(g.pathType, this.index.lookup(g.pathFn))
         .find(s => s.kind === R65SymbolKind.Function)?.returnType;
     } else if (g.head === 'self') {
       type = this.enclosingContainer(src, line);
     } else {
-      type = this.bindingAt(src, line, g.head)?.type;
+      const binding = this.bindingAt(src, line, g.head);
+      type = binding?.type;
+      typeText = binding?.typeText;
     }
 
     for (const field of g.fields.split('.').map(f => f.replace(/\[.*$/, '').trim()).filter(Boolean)) {
       if (!type) return undefined;
-      type = this.fieldType(type, field);
+      const sym = this.fieldSymbol(type, field);
+      type = sym?.declaredType;
+      typeText = sym?.typeText;
     }
-    return type;
+
+    for (; peel > 0 && typeText !== undefined; peel--) typeText = elementTypeText(typeText);
+    const shape = peel === 0 ? valueShape(typeText) : undefined;
+    return type || shape !== undefined ? { type, shape } : undefined;
   }
 
-  private fieldType(type: string, field: string): string | undefined {
+  private fieldSymbol(type: string, field: string): R65Symbol | undefined {
     return this.index.lookup(field)
-      .find(s => s.kind === R65SymbolKind.Field && s.container === type)?.declaredType;
+      .find(s => s.kind === R65SymbolKind.Field && s.container === type);
   }
 
   /**
@@ -189,7 +220,8 @@ export class R65Resolver {
       const text = src.lineAt(i).text;
       const m = text.match(letRe);
       if (m) {
-        return { type: baseTypeName(m[1]), decl: text.substring(m.index!, m.index! + m[0].length).trim() };
+        const decl = text.substring(m.index!, m.index! + m[0].length).trim();
+        return { type: baseTypeName(m[1]), decl, typeText: declTypeText(decl) };
       }
       const p = text.match(payloadRe);
       if (p) {
@@ -204,15 +236,15 @@ export class R65Resolver {
         if (param) {
           return name === 'self'
             ? { type: this.enclosingContainer(src, i), decl: param.text }
-            : { type: param.type, decl: param.text };
+            : { type: param.type, decl: param.text, typeText: param.typeText };
         }
         break;
       }
     }
 
     for (const sym of this.index.lookup(name)) {
-      if ((sym.kind === R65SymbolKind.Static || sym.kind === R65SymbolKind.Constant) && sym.declaredType) {
-        return { type: sym.declaredType, decl: sym.signature ?? name };
+      if ((sym.kind === R65SymbolKind.Static || sym.kind === R65SymbolKind.Constant) && (sym.declaredType || sym.typeText)) {
+        return { type: sym.declaredType, decl: sym.signature ?? name, typeText: sym.typeText };
       }
     }
     return undefined;
