@@ -41,12 +41,12 @@ export const PATH_RE = /\b([A-Z][a-zA-Z0-9_]*)\s*::\s*$/;
 
 /**
  * A receiver chain immediately before the cursor word, ending in `.`:
- * `self.tilemap.bmp.`, `oam[i].`, `(*p).`, `Q10::from_int(3).`. The head may
+ * `self.tilemap.bmp.`, `oam[i].`, `(*p).`, `Q10::from_int(3).`, `tile.0.`. The head may
  * not follow a `.` itself — a call in mid-chain (`a.b(c).d.`) isn't followed.
  */
 const CHAIN_RE = new RegExp(
   `(?<![.\\w])(?:\\(\\s*\\*\\s*(?<deref>${IDENT})\\s*\\)|(?<pathType>[A-Z][a-zA-Z0-9_]*)\\s*::\\s*(?<pathFn>${IDENT})\\s*\\([^()]*\\)|(?<head>${IDENT}))` +
-  `(?:\\s*\\[[^\\]]*\\])*(?<fields>(?:\\s*\\.\\s*${IDENT}(?:\\s*\\[[^\\]]*\\])*)*)\\s*\\.\\s*$`
+  `(?:\\s*\\[[^\\]]*\\])*(?<fields>(?:\\s*\\.\\s*(?:${IDENT}|\\d+)(?:\\s*\\[[^\\]]*\\])*)*)\\s*\\.\\s*$`
 );
 
 /** `impl Trait for Type {` / `impl Type {` */

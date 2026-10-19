@@ -74,6 +74,9 @@ const VARIANT_PATTERN = /(?:^|[{,])\s*(?<variant>[a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\(
 /** A struct/union field: `x: u8`, `src: far *u8`, `far *next: Node`, `buf: [u8; 9]` */
 const FIELD_PATTERN = /(?:^|[{,])\s*(?<item>(?:(?:far|near)\s+)?\*?\s*(?<field>[a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(?<type>[^,]*))/g;
 
+/** `struct TileId(u8);` / `struct Cb(fn(u8) -> u8);` — a newtype, whose payload reads as `.0` */
+const NEWTYPE_PATTERN = /\bstruct\s+(?<newtype>[A-Z][a-zA-Z0-9_]*)\s*\((?<payload>.*)\)\s*;/;
+
 const PRIMITIVES = new Set(['u8', 'u16', 'i8', 'i16', 'bool', 'fn']);
 
 /** `// ====` / `// ----` section banners, which are not documentation */
@@ -403,8 +406,27 @@ export function scanText(text: string, uri: vscode.Uri): ScanResult {
       break; // Only match one pattern per line
     }
 
-    // Body header: items may start after its `{` on this same line
     const masked = maskLineComment(line);
+
+    // A newtype's payload is its field `0`
+    const newtype = masked.match(NEWTYPE_PATTERN);
+    if (newtype?.groups) {
+      const payload = newtype.groups.payload.trim();
+      const start = line.indexOf(payload, newtype.index! + newtype[0].indexOf('('));
+      symbols.push({
+        name: '0',
+        kind: R65SymbolKind.Field,
+        uri,
+        range: new vscode.Range(i, 0, i, line.length),
+        selectionRange: new vscode.Range(i, start, i, start + payload.length),
+        container: newtype.groups.newtype,
+        declaredType: baseTypeName(payload),
+        typeText: payload,
+        signature: `0: ${payload}`,
+      });
+    }
+
+    // Body header: items may start after its `{` on this same line
     const bodyMatch = masked.match(BODY_OPEN_PATTERN);
     if (bodyMatch?.groups) {
       const open = bodyMatch.index! + bodyMatch[0].length;

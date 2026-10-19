@@ -157,6 +157,33 @@ describe('Completion', () => {
     assert.strictEqual(complete(index, 'fn f(p: *[u8; 4]) {\n    p.'), undefined, 'pointer to array');
   });
 
+  it('should offer a newtype its payload as .0 and complete through it', async () => {
+    const index = await indexed({
+      '/test/lib.r65': LIB,
+      '/test/types.r65': [
+        'struct TileId(u8);',
+        'struct Flag(bool);',
+        'struct Handle(*OamEntry);',
+        'impl TileId {',
+        '    fn next(self) -> TileId {',
+        '    }',
+        '}',
+      ].join('\n'),
+    });
+    const of = (content: string) => labels(complete(index, content)).sort();
+
+    assert.deepStrictEqual(of('fn f(t: TileId) {\n    t.'), ['0', 'next']);
+    const zero = complete(index, 'fn f(t: TileId) {\n    t.')!.find(i => i.label === '0');
+    assert.strictEqual(zero.kind, CompletionItemKind.Field);
+    assert.strictEqual(zero.detail, '0: u8');
+    assert.deepStrictEqual(of('fn f(g: Flag) {\n    g.'), ['0'], 'no impl');
+    assert.deepStrictEqual(of('fn f(t: TileId) {\n    t.0'), ['0', 'next'], 'typing the 0');
+    assert.deepStrictEqual(of('fn f(t: TileId) {\n    t.0.'), ['rotate_left', 'rotate_right']);
+    assert.deepStrictEqual(of('fn f(t: TileId) {\n    t.0.ro'), ['rotate_left', 'rotate_right']);
+    assert.ok(of('fn f(h: Handle) {\n    h.0.').includes('tile'), 'pointer payload');
+    assert.strictEqual(complete(index, 'fn f(g: Flag) {\n    g.0.'), undefined, 'bool payload');
+  });
+
   it('should leave an unknown receiver to word-based suggestions', async () => {
     const index = await indexed({ '/test/lib.r65': LIB });
     assert.strictEqual(complete(index, 'fn f() {\n    mystery.'), undefined);

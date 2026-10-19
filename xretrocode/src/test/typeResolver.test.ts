@@ -121,9 +121,11 @@ describe('Index: fields, types, signatures and docs', () => {
     assert.strictEqual(syms.find(s => s.name === 'after')!.container, undefined);
   });
 
-  it('should index fields of a one-line #[soa] struct and skip newtypes', () => {
+  it('should index fields of a one-line #[soa] struct and only 0 for a newtype', () => {
     const syms = parse('#[soa] struct Launcher { armed: u8 }\nstruct Meters(u16);');
-    assert.deepStrictEqual(syms.filter(s => s.kind === R65SymbolKind.Field).map(f => f.name), ['armed']);
+    assert.deepStrictEqual(syms.filter(s => s.kind === R65SymbolKind.Field).map(f => [f.container, f.name]), [
+      ['Launcher', 'armed'], ['Meters', '0'],
+    ]);
     assert.strictEqual(syms.find(s => s.name === 'Launcher')!.signature, 'struct Launcher');
   });
 
@@ -182,6 +184,17 @@ describe('Index: fields, types, signatures and docs', () => {
     assert.strictEqual(from.returnType, 'Q10');
     assert.strictEqual(from.hasSelf, false);
     assert.strictEqual(div.hasSelf, true);
+  });
+
+  it('should index a newtype payload as field 0', () => {
+    const syms = parseSymbolsFromText('struct TileId(u8);\nstruct Cb(fn(u8) -> u8); // callback\nstruct H(*Player);', Uri.file('/t.r65') as any);
+    const zeros = syms.filter(s => s.name === '0');
+    assert.deepStrictEqual(zeros.map(z => [z.container, z.kind, z.declaredType, z.typeText, z.signature]), [
+      ['TileId', R65SymbolKind.Field, undefined, 'u8', '0: u8'],
+      ['Cb', R65SymbolKind.Field, undefined, 'fn(u8) -> u8', '0: fn(u8) -> u8'],
+      ['H', R65SymbolKind.Field, 'Player', '*Player', '0: *Player'],
+    ]);
+    assert.strictEqual(zeros[0].selectionRange.start.character, 'struct TileId('.length);
   });
 
   it('should nest fields under their struct in the Outline', () => {

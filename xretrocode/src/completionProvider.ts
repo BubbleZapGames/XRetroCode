@@ -93,7 +93,8 @@ export class R65CompletionProvider implements vscode.CompletionItemProvider {
       return undefined;
     }
 
-    const partial = prefix.match(/[a-zA-Z_][a-zA-Z0-9_]*$/)?.[0] ?? '';
+    // A name, or a newtype's `0` being typed after its `.`
+    const partial = prefix.match(/[a-zA-Z_][a-zA-Z0-9_]*$|(?<=\.\s*)\d+$/)?.[0] ?? '';
     const before = prefix.substring(0, prefix.length - partial.length);
 
     const path = before.match(PATH_RE);
@@ -102,8 +103,8 @@ export class R65CompletionProvider implements vscode.CompletionItemProvider {
       return members.length > 0 ? this.items(members) : undefined;
     }
 
-    // `value.` but not a `..` range or a number's decimal point
-    if (/(?<![.\d])\.\s*$/.test(before)) {
+    // `value.` but not a `..` range or a number's decimal point; `tile.0.` is a member
+    if (/(?<![.\d])\.\s*$/.test(before) || /[\w\])]\s*\.\s*\d+\s*\.\s*$/.test(before)) {
       const receiver = this.resolver.receiver(document, position.line, before);
       if (!receiver) return undefined;
       const items = receiver.type ? this.items(this.resolver.allMembers(receiver.type).filter(isDotMember)) : [];
