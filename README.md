@@ -24,6 +24,9 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
   and a workspace with several shows a picker.
 - Breakpoints in `.r65` and `.c` source, including conditional breakpoints
   evaluated by Mesen's expression engine
+- Function breakpoints by name (**Run → New Breakpoint → Function
+  Breakpoint**): a function, or any label in the symbol file. A C function
+  matches with or without cc65's leading `_`.
 - Step over, in and out, pause and continue. Each emulated CPU appears as its
   own thread.
 - Registers, flags and memory in the Variables view, plus expression evaluation
