@@ -36,6 +36,19 @@
           ".r65"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "retroasm",
+        "aliases": [
+          "Retro Assembly",
+          "retroasm"
+        ],
+        "extensions": [
+          ".s",
+          ".asm",
+          ".inc"
+        ],
+        "configuration": "./asm-language-configuration.json"
       }
     ],
     "grammars": [
@@ -201,7 +214,8 @@
         "languages": [
           "r65",
           "c",
-          "cpp"
+          "cpp",
+          "retroasm"
         ],
         "configurationSnippets": [
           {
@@ -227,6 +241,9 @@
       },
       {
         "language": "cpp"
+      },
+      {
+        "language": "retroasm"
       }
     ],
     "configuration": {

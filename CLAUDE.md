@@ -70,6 +70,8 @@ xretrocode/
                                 problemMatchers, debuggers, breakpoints, configuration
   tsconfig.json               — TypeScript config
   language-configuration.json — Comments, brackets, auto-closing, indentation
+  asm-language-configuration.json — `;` comments for "retroasm" (.s/.asm/.inc): a
+                                language with no grammar, so assembly files take breakpoints
   syntaxes/
     r65.tmLanguage.json       — TextMate grammar for .r65
   src/

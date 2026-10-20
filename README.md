@@ -22,8 +22,8 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
 
 - Launch a ROM. A workspace with a single ROM starts with no configuration,
   and a workspace with several shows a picker.
-- Breakpoints in `.r65` and `.c` source, including conditional breakpoints
-  evaluated by Mesen's expression engine
+- Breakpoints in `.r65`, `.c` and assembly (`.s`, `.asm`, `.inc`) source,
+  including conditional breakpoints evaluated by Mesen's expression engine
 - Function breakpoints by name (**Run → New Breakpoint → Function
   Breakpoint**): a function, or any label in the symbol file. A C function
   matches with or without cc65's leading `_`.
@@ -150,10 +150,20 @@ view show function names.
 
 **ca65 on the SNES** (for example with [libSFX](https://github.com/Optiroc/libSFX))
 gets breakpoints on assembly source lines from ld65's debug file. libSFX
-writes it with `make debug=2`, as `<name>.dnfo`: point `dbgPath` at it. For
-breakpoints in `.s` or `.asm` files, turn on the
-`debug.allowBreakpointsEverywhere` setting, since assembly language IDs depend
-on which extension you use for them.
+writes it with `make debug=2`, as `<name>.dnfo`: point `dbgPath` at it.
+
+### Assembly
+
+An assembly-only project debugs the same way: build with `ca65 -g` and
+`ld65 --dbgfile`, and set breakpoints on `.s` lines, step over and into
+subroutines, and see each `.proc` named in the call stack. WLA-DX projects get
+function breakpoints and named frames from their `.sym`.
+
+The extension opens `.s`, `.asm` and `.inc` files as **Retro Assembly**, a
+language with `;` comments and no highlighting, so the gutter takes
+breakpoints. If you use an assembly extension for highlighting, associate the
+files with its language instead (`files.associations`) and turn on
+`debug.allowBreakpointsEverywhere` so breakpoints still work.
 
 ### Editing C
 

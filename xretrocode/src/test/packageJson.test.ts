@@ -17,9 +17,19 @@ describe('package.json', () => {
     it('should define r65 language', () => {
         const langs = pkg.contributes.languages;
         assert.ok(langs);
-        assert.strictEqual(langs.length, 1);
+        assert.strictEqual(langs.length, 2);
         assert.strictEqual(langs[0].id, 'r65');
         assert.ok(langs[0].extensions.includes('.r65'));
+    });
+
+    it('should define a minimal assembly language so .s/.asm files take breakpoints', () => {
+        const asm = pkg.contributes.languages.find((l: any) => l.id === 'retroasm');
+        assert.ok(asm);
+        assert.deepStrictEqual(asm.extensions, ['.s', '.asm', '.inc']);
+        // Comments only: no grammar, so another extension's highlighting still applies
+        assert.ok(!pkg.contributes.grammars.some((g: any) => g.language === 'retroasm'));
+        const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', asm.configuration), 'utf8'));
+        assert.strictEqual(config.comments.lineComment, ';');
     });
 
     it('should reference language configuration', () => {
@@ -113,18 +123,18 @@ describe('package.json', () => {
         assert.strictEqual(pkg.contributes.configurationSnippets, undefined);
     });
 
-    it('should allow breakpoints in r65 and C files', () => {
+    it('should allow breakpoints in r65, C and assembly files', () => {
         // Without this VSCode refuses to place breakpoints in the gutter.
         // VS Code opens .c as c and .h as cpp.
         assert.ok(pkg.contributes.breakpoints);
-        for (const language of ['r65', 'c', 'cpp']) {
+        for (const language of ['r65', 'c', 'cpp', 'retroasm']) {
             assert.ok(pkg.contributes.breakpoints.some((b: any) => b.language === language), language);
         }
     });
 
-    it('should offer the debugger for r65 and C files', () => {
+    it('should offer the debugger for r65, C and assembly files', () => {
         // F5 with no launch.json lists the debuggers for the active file's language
-        assert.deepStrictEqual(pkg.contributes.debuggers[0].languages, ['r65', 'c', 'cpp']);
+        assert.deepStrictEqual(pkg.contributes.debuggers[0].languages, ['r65', 'c', 'cpp', 'retroasm']);
     });
 
     it('should define the xretrocode.mesenDapPath setting', () => {
