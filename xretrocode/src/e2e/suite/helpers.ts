@@ -1,5 +1,6 @@
 // Shared plumbing for the e2e suites: launch sessions on Mesen-GDB's test
-// ROMs (green, in R65; hello_c, in C) and watch what the adapter sends.
+// ROMs (green, in R65; hello_c, in C; hello_asm, in ca65 assembly) and watch
+// what the adapter sends.
 import * as assert from 'assert';
 import { execSync } from 'child_process';
 import * as path from 'path';
@@ -41,6 +42,20 @@ export const C_LINES = {
   CALL_ADD: 16,
   /** `if (counter == 100) {`, right after CALL_ADD */
   IF: 17,
+};
+
+/** hello_asm: a ca65 assembly program for the NES, its .dbg beside it */
+export const ASM_ROM = path.join(WORKSPACE, 'hello_asm', 'hello.nes');
+export const ASM_SOURCE = vscode.Uri.file(path.join(WORKSPACE, 'hello_asm', 'hello.s'));
+
+/** Lines of hello.s the tests aim at. */
+export const ASM_LINES = {
+  /** `jsr tick` in reset's loop */
+  CALL_TICK: 26,
+  /** `lda counter`, right after CALL_TICK */
+  AFTER_CALL: 27,
+  /** `inc counter`, first line of tick */
+  TICK_FIRST: 36,
 };
 
 export interface DapMessage {

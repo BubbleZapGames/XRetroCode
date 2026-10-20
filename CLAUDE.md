@@ -95,8 +95,8 @@ xretrocode/
                                 (npm run test:e2e): green (R65, SNES) for breakpoints and
                                 conditions, stepping, pause and inspection, launch path,
                                 lifecycle, macro definitions, .sym labels; hello_c (cc65
-                                C, NES) for C breakpoints and stepping. e2e/fixtures/ is
-                                copied into its workspace
+                                C, NES) for C breakpoints and stepping; hello_asm (ca65,
+                                NES) for assembly. e2e/fixtures/ is copied into its workspace
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```

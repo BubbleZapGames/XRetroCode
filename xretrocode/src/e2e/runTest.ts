@@ -16,11 +16,13 @@ import { runTests } from '@vscode/test-electron';
 const EXTENSION_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, '..');
 // Mesen-GDB's own deterministic test ROMs, with their symbols and source:
-// green (R65, SNES) at the workspace root, hello_c (cc65 C, NES) in hello_c/
+// green (R65, SNES) at the workspace root, hello_c (cc65 C, NES) in hello_c/,
+// hello_asm (ca65 assembly, NES) in hello_asm/
 const TEST_ROMS = path.join(REPO_ROOT, 'Mesen-GDB', 'tests', 'roms');
 const ROM_FILES: { dir: string; files: string[]; to: string }[] = [
   { dir: 'green', files: ['green.sfc', 'green.dbg', 'green.sym', 'green.r65'], to: '' },
   { dir: 'hello_c', files: ['hello.nes', 'hello.dbg', 'hello.c'], to: 'hello_c' },
+  { dir: 'hello_asm', files: ['hello.nes', 'hello.dbg', 'hello.s'], to: 'hello_asm' },
 ];
 // Copied in beside them: stand-in definitions for the stdlib macros green.r65 uses
 const FIXTURES = path.join(EXTENSION_ROOT, 'src', 'e2e', 'fixtures');
@@ -64,7 +66,7 @@ function makeWorkspace(root: string): string {
       'xretrocode.buildBeforeLaunch': false,
       // ROM discovery should find green.sfc alone: a launch with no romPath
       // picks the workspace's only ROM without asking
-      'files.exclude': { 'hello_c/*.nes': true },
+      'files.exclude': { 'hello_c/*.nes': true, 'hello_asm/*.nes': true },
     }, null, 2)
   );
   return workspace;
