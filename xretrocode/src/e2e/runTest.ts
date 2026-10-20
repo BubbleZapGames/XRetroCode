@@ -15,9 +15,13 @@ import { runTests } from '@vscode/test-electron';
 
 const EXTENSION_ROOT = path.resolve(__dirname, '..', '..');
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, '..');
-// Mesen-GDB's own deterministic test ROM, with its .dbg and source
-const ROM_DIR = path.join(REPO_ROOT, 'Mesen-GDB', 'tests', 'roms', 'green');
-const ROM_FILES = ['green.sfc', 'green.dbg', 'green.r65'];
+// Mesen-GDB's own deterministic test ROMs, with their symbols and source:
+// green (R65, SNES) at the workspace root, hello_c (cc65 C, NES) in hello_c/
+const TEST_ROMS = path.join(REPO_ROOT, 'Mesen-GDB', 'tests', 'roms');
+const ROM_FILES: { dir: string; files: string[]; to: string }[] = [
+  { dir: 'green', files: ['green.sfc', 'green.dbg', 'green.sym', 'green.r65'], to: '' },
+  { dir: 'hello_c', files: ['hello.nes', 'hello.dbg', 'hello.c'], to: 'hello_c' },
+];
 // Copied in beside them: stand-in definitions for the stdlib macros green.r65 uses
 const FIXTURES = path.join(EXTENSION_ROOT, 'src', 'e2e', 'fixtures');
 
@@ -35,25 +39,33 @@ function findMesenGdb(): string {
 }
 
 /**
- * A workspace holding just the ROM, its symbols and its source. No Makefile,
- * so launching never runs a build.
+ * A workspace holding just the ROMs, their symbols and their source. No
+ * Makefile, so launching never runs a build.
  */
 function makeWorkspace(root: string): string {
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(path.join(workspace, '.vscode'), { recursive: true });
-  for (const file of ROM_FILES) {
-    const from = path.join(ROM_DIR, file);
-    if (!fs.existsSync(from)) {
-      throw new Error(`missing test ROM file ${from}: run ./setup.sh to fetch the Mesen-GDB submodule`);
+  for (const { dir, files, to } of ROM_FILES) {
+    fs.mkdirSync(path.join(workspace, to), { recursive: true });
+    for (const file of files) {
+      const from = path.join(TEST_ROMS, dir, file);
+      if (!fs.existsSync(from)) {
+        throw new Error(`missing test ROM file ${from}: run ./setup.sh to fetch the Mesen-GDB submodule`);
+      }
+      fs.copyFileSync(from, path.join(workspace, to, file));
     }
-    fs.copyFileSync(from, path.join(workspace, file));
   }
   for (const file of fs.readdirSync(FIXTURES)) {
     fs.copyFileSync(path.join(FIXTURES, file), path.join(workspace, file));
   }
   fs.writeFileSync(
     path.join(workspace, '.vscode', 'settings.json'),
-    JSON.stringify({ 'xretrocode.buildBeforeLaunch': false }, null, 2)
+    JSON.stringify({
+      'xretrocode.buildBeforeLaunch': false,
+      // ROM discovery should find green.sfc alone: a launch with no romPath
+      // picks the workspace's only ROM without asking
+      'files.exclude': { 'hello_c/*.nes': true },
+    }, null, 2)
   );
   return workspace;
 }

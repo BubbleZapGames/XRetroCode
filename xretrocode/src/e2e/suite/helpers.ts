@@ -1,5 +1,5 @@
-// Shared plumbing for the e2e suites: launch sessions on Mesen-GDB's green
-// test ROM and watch what the adapter sends.
+// Shared plumbing for the e2e suites: launch sessions on Mesen-GDB's test
+// ROMs (green, in R65; hello_c, in C) and watch what the adapter sends.
 import * as assert from 'assert';
 import { execSync } from 'child_process';
 import * as path from 'path';
@@ -25,6 +25,24 @@ export const LINES = {
   MAIN_LOOP: 31,
 };
 
+/** hello_c: a cc65 C program for the NES, its .dbg beside it */
+export const C_ROM = path.join(WORKSPACE, 'hello_c', 'hello.nes');
+export const C_SOURCE = vscode.Uri.file(path.join(WORKSPACE, 'hello_c', 'hello.c'));
+
+/** Lines of hello.c the tests aim at. */
+export const C_LINES = {
+  /** `{` opening add: cc65 files its prologue there */
+  ADD_OPEN: 7,
+  /** `sum = a + b;`, first statement of add */
+  ADD_FIRST: 9,
+  /** `return sum;` */
+  ADD_RETURN: 10,
+  /** `counter = add(counter, 1);` in main's loop */
+  CALL_ADD: 16,
+  /** `if (counter == 100) {`, right after CALL_ADD */
+  IF: 17,
+};
+
 export interface DapMessage {
   type: string;
   event?: string;
@@ -42,7 +60,10 @@ export interface BreakpointReport {
   message?: string;
 }
 
-/** Everything the adapter said about breakpoints, in order: setBreakpoints responses and breakpoint events. */
+/** Requests whose responses report breakpoints: source, function and disassembly-view ones. */
+const BREAKPOINT_REQUESTS = new Set(['setBreakpoints', 'setFunctionBreakpoints', 'setInstructionBreakpoints']);
+
+/** Everything the adapter said about breakpoints, in order: those responses and breakpoint events. */
 export const breakpointReports: BreakpointReport[] = [];
 
 /** The latest report per breakpoint id among those after index `since`. */
@@ -80,7 +101,7 @@ export function installTracker(): void {
         if (message.type === 'event') {
           if (message.event === 'breakpoint') noteBreakpoint(message.body?.breakpoint);
           record(message);
-        } else if (message.type === 'response' && message.command === 'setBreakpoints') {
+        } else if (message.type === 'response' && BREAKPOINT_REQUESTS.has(message.command ?? '')) {
           for (const bp of message.body?.breakpoints ?? []) noteBreakpoint(bp);
         }
       },
@@ -182,11 +203,16 @@ export async function stopSession(): Promise<void> {
 
 /** Replace all breakpoints with ones at these lines of green.r65. */
 export function breakAt(...lines: (number | { line: number; condition: string })[]): void {
+  breakIn(SOURCE, ...lines);
+}
+
+/** Replace all breakpoints with ones at these lines of `source`. */
+export function breakIn(source: vscode.Uri, ...lines: (number | { line: number; condition: string })[]): void {
   vscode.debug.removeBreakpoints(vscode.debug.breakpoints);
   vscode.debug.addBreakpoints(lines.map(l => {
     const { line, condition } = typeof l === 'number' ? { line: l, condition: undefined } : l;
     return new vscode.SourceBreakpoint(
-      new vscode.Location(SOURCE, new vscode.Position(line - 1, 0)), true, condition
+      new vscode.Location(source, new vscode.Position(line - 1, 0)), true, condition
     );
   }));
 }
@@ -208,9 +234,9 @@ export function inGreenSource(frame: Frame): boolean {
   return !!frame.source?.path?.endsWith('green.r65');
 }
 
-/** Start with a breakpoint at `line` and wait for it to be hit. */
-export async function runTo(line: number, overrides: Partial<vscode.DebugConfiguration> = {}) {
-  breakAt(line);
+/** Start with a breakpoint at `line` (of green.r65, unless `source` says) and wait for it to be hit. */
+export async function runTo(line: number, overrides: Partial<vscode.DebugConfiguration> = {}, source = SOURCE) {
+  breakIn(source, line);
   const since = mark();
   const session = await startSession(overrides);
   const stopped = await waitForStopped('breakpoint', since);

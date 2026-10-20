@@ -89,10 +89,12 @@ xretrocode/
                                 macros on the stopped line (the debugger steps over them)
     tasks.ts                  — r65c build/check task provider
     config.ts                 — Compiler settings (r65.*)
-    e2e/                      — Real VS Code + mesen-gdb on Mesen-GDB's green test ROM
-                                (npm run test:e2e): breakpoints and conditions, stepping,
-                                pause and inspection, launch path, lifecycle, macro
-                                definitions; e2e/fixtures/ is copied into its workspace
+    e2e/                      — Real VS Code + mesen-gdb on Mesen-GDB's test ROMs
+                                (npm run test:e2e): green (R65, SNES) for breakpoints and
+                                conditions, stepping, pause and inspection, launch path,
+                                lifecycle, macro definitions, .sym labels; hello_c (cc65
+                                C, NES) for C breakpoints and stepping. e2e/fixtures/ is
+                                copied into its workspace
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```
