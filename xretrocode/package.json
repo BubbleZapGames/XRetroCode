@@ -115,8 +115,41 @@
         "command": "xretrocode.pickRom",
         "title": "Select ROM to Debug",
         "category": "XRetroCode"
+      },
+      {
+        "command": "xretrocode.goToMacroDefinition",
+        "title": "Go to Macro Definition",
+        "category": "XRetroCode",
+        "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "xretrocode.stepIntoMacro",
+        "title": "Step Into (Macro Definition)",
+        "category": "XRetroCode"
       }
     ],
+    "keybindings": [
+      {
+        "key": "f11",
+        "command": "xretrocode.stepIntoMacro",
+        "when": "debugType == 'xretrocode' && debugState == 'stopped' && xretrocode.stepIntoMacro"
+      }
+    ],
+    "menus": {
+      "debug/toolbar": [
+        {
+          "command": "xretrocode.goToMacroDefinition",
+          "when": "debugType == 'xretrocode' && xretrocode.stoppedOnMacro"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "xretrocode.goToMacroDefinition",
+          "when": "inDebugMode && editorLangId == r65",
+          "group": "navigation"
+        }
+      ]
+    },
     "debuggers": [
       {
         "type": "xretrocode",

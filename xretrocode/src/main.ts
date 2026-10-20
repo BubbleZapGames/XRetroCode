@@ -8,6 +8,7 @@ import { R65HoverProvider } from './hoverProvider';
 import { R65CompletionProvider } from './completionProvider';
 import { R65ReferenceProvider } from './referenceProvider';
 import { R65WorkspaceSymbolProvider } from './workspaceSymbolProvider';
+import { MacroDefinitionAid } from './macroDefinitionAid';
 import { DebugAdapterDescriptorFactory, setExtensionPath } from './debugAdapter';
 import { ConfigurationProvider } from './debugConfiguration';
 import { pickRom } from './romLocator';
@@ -51,6 +52,8 @@ function activateLanguage(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.languages.registerWorkspaceSymbolProvider(new R65WorkspaceSymbolProvider(symbolIndex))
     );
+    // The debugger steps over macros; offer their definitions when stopped on one
+    context.subscriptions.push(new MacroDefinitionAid(symbolIndex));
 }
 
 // Mesen-GDB debug adapter

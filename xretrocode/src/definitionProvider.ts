@@ -18,7 +18,7 @@ function sharedSegments(a: string, b: string): number {
  * name and owner, so candidates that agree on those are copies: jump to the
  * one nearest the file being edited instead of offering a picker.
  */
-function nearestCopy(symbols: R65Symbol[], from: vscode.Uri): R65Symbol[] {
+export function nearestCopy(symbols: R65Symbol[], from: vscode.Uri): R65Symbol[] {
   if (symbols.length < 2) return symbols;
   const id = (s: R65Symbol) => `${s.kind}|${s.container ?? ''}|${s.name}`;
   if (!symbols.every(s => id(s) === id(symbols[0]))) return symbols;

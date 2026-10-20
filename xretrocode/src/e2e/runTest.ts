@@ -18,6 +18,8 @@ const REPO_ROOT = path.resolve(EXTENSION_ROOT, '..');
 // Mesen-GDB's own deterministic test ROM, with its .dbg and source
 const ROM_DIR = path.join(REPO_ROOT, 'Mesen-GDB', 'tests', 'roms', 'green');
 const ROM_FILES = ['green.sfc', 'green.dbg', 'green.r65'];
+// Copied in beside them: stand-in definitions for the stdlib macros green.r65 uses
+const FIXTURES = path.join(EXTENSION_ROOT, 'src', 'e2e', 'fixtures');
 
 function findMesenGdb(): string {
   const candidates = [
@@ -45,6 +47,9 @@ function makeWorkspace(root: string): string {
       throw new Error(`missing test ROM file ${from}: run ./setup.sh to fetch the Mesen-GDB submodule`);
     }
     fs.copyFileSync(from, path.join(workspace, file));
+  }
+  for (const file of fs.readdirSync(FIXTURES)) {
+    fs.copyFileSync(path.join(FIXTURES, file), path.join(workspace, file));
   }
   fs.writeFileSync(
     path.join(workspace, '.vscode', 'settings.json'),

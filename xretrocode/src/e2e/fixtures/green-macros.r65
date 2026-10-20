@@ -1,0 +1,31 @@
+// Stand-ins for the stdlib macros green.r65 invokes, so the e2e workspace
+// can resolve their definitions without the R65 stdlib. Only the names
+// matter here; the ROM was built against the real ones.
+
+macro_rules! clear_nmi() {
+    asm!("BIT $4210");
+}
+
+macro_rules! set_backdrop($color:expr) {
+    CGADD = 0;
+    CGDATA = ($color) as u8;
+    CGDATA = (($color) >> 8) as u8;
+}
+
+macro_rules! set_brightness($level:expr) {
+    INIDISP = $level;
+}
+
+macro_rules! enable_nmi() {
+    NMITIMEN = NMITIMEN | 0x80;
+}
+
+macro_rules! wait_nmi() {
+    asm!("WAI");
+}
+
+impl Color {
+    macro_rules! rgb($r:expr, $g:expr, $b:expr) {
+        ($r) | (($g) << 5) | (($b) << 10)
+    }
+}
