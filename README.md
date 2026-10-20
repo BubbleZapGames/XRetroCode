@@ -141,14 +141,19 @@ Step Into skips cc65's runtime helpers (`pusha`, `incsp2`, ...) and stops at
 the next C line. Frames in code with no source on disk, like cc65's runtime
 library, show their address and open in the disassembly view.
 
-**816-tcc / PVSnesLib** (SNES) goes through WLA-DX, whose `.sym` file has
-labels but no C line numbers. You get function names in the call stack and in
-the disassembly view. Linking with `wlalink -S -A` (assembling with
-`wla-65816 -i`) adds line mapping into the generated assembly. Some WLA-DX
-builds write that mapping wrong, so check that breakpoints in the `.asm` land
-where they should. To set breakpoints in `.s` or `.asm` files, turn on the
-`debug.allowBreakpointsEverywhere` setting: assembly language IDs depend on
-which extension you use for them.
+**816-tcc / PVSnesLib** (SNES): 816-tcc records no line numbers at all, so
+no debugger can stop on a `.c` line in a PVSnesLib build. PVSnesLib's link
+step writes `<rom>.sym` with every function's label, which this extension
+loads by default: set a function breakpoint (**Run → New Breakpoint →
+Function Breakpoint**) on a C function, and the call stack and disassembly
+view show function names.
+
+**ca65 on the SNES** (for example with [libSFX](https://github.com/Optiroc/libSFX))
+gets breakpoints on assembly source lines from ld65's debug file. libSFX
+writes it with `make debug=2`, as `<name>.dnfo`: point `dbgPath` at it. For
+breakpoints in `.s` or `.asm` files, turn on the
+`debug.allowBreakpointsEverywhere` setting, since assembly language IDs depend
+on which extension you use for them.
 
 ### Editing C
 
