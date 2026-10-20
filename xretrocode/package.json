@@ -2,7 +2,7 @@
   "name": "xretrocode",
   "displayName": "XRetroCode",
   "description": "R65 language support and Mesen-GDB source-level debugging for retro console development",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "XRetroCode",
   "license": "Apache-2.0",
   "repository": {
