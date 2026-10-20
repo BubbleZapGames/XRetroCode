@@ -49,7 +49,11 @@ Mesen-GDB/
     DapNotificationListener.h — INotificationListener impl bridging Mesen events → DAP events
     CpuStateSerializer.h/cpp  — Per-CPU-type register state → JSON serialization
     DbgFileParser.h/cpp       — .dbg symbol file parser (ported from UI/Debugger/Integration/DbgImporter.cs)
-    SourceMapper.h/cpp        — Bidirectional address ↔ source file+line mapping
+    WlaSymParser.h/cpp        — WLA-DX .sym parser: labels, [addr-to-line mapping] (ported
+                                from the deleted WlaDxImporter.cs)
+    SourceMapper.h/cpp        — Bidirectional address ↔ source file+line mapping, from
+                                either file. A cc65 C line (type=1) beats the assembly
+                                generated for it, so stops and steps land in the .c file
   DapMain/
     DapMain.cpp               — main() entry point for mesen-dap executable
 ```
@@ -162,7 +166,7 @@ xretrocode/
 14. SourceMapper — `GetSourceLocation(address)` and `GetAddress(file, line)` lookups
 15. Source breakpoints — `setBreakpoints` with source file + line → resolve to address via SourceMapper
 16. Stack traces with source — Return DAP StackFrames with source file + line info
-17. Symbol loading in launch config — `dbgPath` launch config option; auto-detect from ROM filename
+17. Symbol loading in launch config — `dbgPath` launch config option (a `.dbg` or a WLA-DX `.sym`); auto-detect from ROM filename
 
 **Verify**: Open .asm file → set breakpoint on line → launch ROM → hits breakpoint → source shown in call stack.
 

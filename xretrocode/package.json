@@ -150,7 +150,7 @@
               },
               "dbgPath": {
                 "type": "string",
-                "description": "Path to the .dbg symbol file. Defaults to the ROM name with a .dbg extension, then <rom dir>/main.dbg.",
+                "description": "Path to the symbol file: a cc65/ld65 .dbg (R65 and cc65 C) or a WLA-DX .sym (wlalink -S; add -A for source lines). Defaults to the ROM name with .dbg, then with .sym, then <rom dir>/main.dbg.",
                 "default": ""
               }
             }
@@ -166,7 +166,9 @@
           }
         ],
         "languages": [
-          "r65"
+          "r65",
+          "c",
+          "cpp"
         ],
         "configurationSnippets": [
           {
@@ -186,6 +188,12 @@
     "breakpoints": [
       {
         "language": "r65"
+      },
+      {
+        "language": "c"
+      },
+      {
+        "language": "cpp"
       }
     ],
     "configuration": {

@@ -113,10 +113,18 @@ describe('package.json', () => {
         assert.strictEqual(pkg.contributes.configurationSnippets, undefined);
     });
 
-    it('should allow breakpoints in r65 files', () => {
-        // Without this VSCode refuses to place breakpoints in the gutter
+    it('should allow breakpoints in r65 and C files', () => {
+        // Without this VSCode refuses to place breakpoints in the gutter.
+        // VS Code opens .c as c and .h as cpp.
         assert.ok(pkg.contributes.breakpoints);
-        assert.ok(pkg.contributes.breakpoints.some((b: any) => b.language === 'r65'));
+        for (const language of ['r65', 'c', 'cpp']) {
+            assert.ok(pkg.contributes.breakpoints.some((b: any) => b.language === language), language);
+        }
+    });
+
+    it('should offer the debugger for r65 and C files', () => {
+        // F5 with no launch.json lists the debuggers for the active file's language
+        assert.deepStrictEqual(pkg.contributes.debuggers[0].languages, ['r65', 'c', 'cpp']);
     });
 
     it('should define the xretrocode.mesenDapPath setting', () => {

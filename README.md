@@ -6,8 +6,10 @@ for the [R65](https://github.com/BubbleZapGames/R65) compiler.
 XRetroCode is a VS Code extension (`xretrocode/`) that drives
 [Mesen-GDB](https://github.com/BubbleZapGames/Mesen-GDB) over the Debug Adapter
 Protocol. Mesen-GDB runs the ROM on Mesen2's emulation core and maps addresses
-back to source lines through the compiler's `.dbg` symbols. You set breakpoints
-in source, step, and inspect registers and memory from the VS Code debugger.
+back to source lines through the build's symbols (a cc65-format `.dbg`, or a
+WLA-DX `.sym`). You set breakpoints in source, step, and inspect registers and
+memory from the VS Code debugger. That works for R65 and for C (see
+[Debugging C](#debugging-c)).
 
 ![Paused on a breakpoint in R65 source, with the 65816 registers, call stack and Debug Console](docs/debugging.png)
 
@@ -20,8 +22,8 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
 
 - Launch a ROM. A workspace with a single ROM starts with no configuration,
   and a workspace with several shows a picker.
-- Breakpoints in `.r65` source, including conditional breakpoints evaluated by
-  Mesen's expression engine
+- Breakpoints in `.r65` and `.c` source, including conditional breakpoints
+  evaluated by Mesen's expression engine
 - Step over, in and out, pause and continue. Each emulated CPU appears as its
   own thread.
 - Registers, flags and memory in the Variables view, plus expression evaluation
@@ -112,10 +114,79 @@ launch configuration:
 | Attribute | Default | Description |
 |---|---|---|
 | `romPath` | prompt | ROM to load. If empty or `${command:xretrocode.pickRom}`, you are prompted to choose one. |
-| `dbgPath` | auto | `.dbg` symbol file. Defaults to the ROM name with `.dbg`, then `<rom dir>/main.dbg`. |
+| `dbgPath` | auto | Symbol file: a `.dbg` (R65, cc65) or a WLA-DX `.sym`. Defaults to the ROM name with `.dbg`, then with `.sym`, then `<rom dir>/main.dbg`. |
 | `stopOnEntry` | `true` | Break at the entry point |
 | `headless` | `false` | Run without the game window |
 | `mesenDapPath` | auto | Path to `mesen-gdb`, overriding the setting |
+
+## Debugging C
+
+Any C project works if its build leaves three things: a Makefile (run before
+each launch), a ROM, and a symbol file next to the ROM.
+
+**cc65** (NES and other 6502 targets) gives full source-level debugging:
+breakpoints in `.c` files, stepping one C statement at a time, and C function
+names in the call stack. Build with debug info at every step:
+
+```make
+cc65 -g -t nes game.c -o game.s
+ca65 -g -t nes game.s -o game.o
+ld65 -C nes.cfg --dbgfile game.dbg -o game.nes game.o nes.lib
+```
+
+Step Into skips cc65's runtime helpers (`pusha`, `incsp2`, ...) and stops at
+the next C line. Frames in code with no source on disk, like cc65's runtime
+library, show their address and open in the disassembly view.
+
+**816-tcc / PVSnesLib** (SNES) goes through WLA-DX, whose `.sym` file has
+labels but no C line numbers. You get function names in the call stack and in
+the disassembly view. Linking with `wlalink -S -A` (assembling with
+`wla-65816 -i`) adds line mapping into the generated assembly. Some WLA-DX
+builds write that mapping wrong, so check that breakpoints in the `.asm` land
+where they should. To set breakpoints in `.s` or `.asm` files, turn on the
+`debug.allowBreakpointsEverywhere` setting: assembly language IDs depend on
+which extension you use for them.
+
+### Editing C
+
+The extension doesn't add C highlighting or IntelliSense. VS Code highlights C
+already, and [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd)
+or Microsoft's [C/C++ extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools)
+does IntelliSense once it knows the toolchain's headers. These keep the host's
+own headers out and give cc65's keywords a definition. For clangd, a `.clangd`
+in the project root:
+
+```yaml
+# cc65 (NES)
+CompileFlags:
+  Add: [-ffreestanding, -nostdinc, -isystem, /path/to/cc65/include,
+        -D__CC65__, -D__NES__, -D__fastcall__=, -D__cdecl__=, -D__near__=, -D__far__=]
+Diagnostics:
+  # cc65's headers declare drivers as `extern void name[]`, which clang rejects
+  Suppress: [err_array_incomplete_or_sizeless_type]
+```
+
+```yaml
+# PVSnesLib (SNES)
+CompileFlags:
+  Add: [-ffreestanding, -nostdinc, -isystem, /path/to/pvsneslib/include,
+        -isystem, /path/to/devkitsnes/include]
+```
+
+For the C/C++ extension, the same in `.vscode/c_cpp_properties.json`:
+
+```json
+{
+  "version": 4,
+  "configurations": [{
+    "name": "cc65",
+    "compilerPath": "",
+    "cStandard": "c89",
+    "includePath": ["${workspaceFolder}/**", "/path/to/cc65/include"],
+    "defines": ["__CC65__", "__NES__", "__fastcall__=", "__cdecl__=", "__near__=", "__far__="]
+  }]
+}
+```
 
 ## Settings
 
@@ -133,7 +204,7 @@ launch configuration:
 ```bash
 cd xretrocode
 npm test                      # unit tests against a mocked vscode API
-xvfb-run -a npm run test:e2e  # real VS Code + mesen-gdb on Mesen-GDB's test ROM
+xvfb-run -a npm run test:e2e  # real VS Code + mesen-gdb on Mesen-GDB's test ROMs
 ```
 
 The e2e suite needs a built `mesen-gdb` (run `make` in `Mesen-GDB/`). It
