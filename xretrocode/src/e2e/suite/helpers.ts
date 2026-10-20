@@ -35,6 +35,23 @@ export interface DapMessage {
 /** Every event the adapter sends, in order, across all sessions. */
 export const events: DapMessage[] = [];
 
+export interface BreakpointReport {
+  id: number;
+  verified: boolean;
+  line?: number;
+  message?: string;
+}
+
+/** Everything the adapter said about breakpoints, in order: setBreakpoints responses and breakpoint events. */
+export const breakpointReports: BreakpointReport[] = [];
+
+/** The latest report per breakpoint id among those after index `since`. */
+export function latestBreakpointReports(since: number): BreakpointReport[] {
+  const latest = new Map<number, BreakpointReport>();
+  for (const report of breakpointReports.slice(since)) latest.set(report.id, report);
+  return [...latest.values()];
+}
+
 let waiters: { match: (e: DapMessage) => boolean; resolve: (e: DapMessage) => void }[] = [];
 let tracker: vscode.Disposable | undefined;
 
@@ -46,12 +63,26 @@ function record(e: DapMessage): void {
   }
 }
 
-/** Watch every xretrocode session's adapter traffic; safe to call from each suite. */
+function noteBreakpoint(bp: BreakpointReport | undefined): void {
+  if (bp?.id !== undefined) breakpointReports.push({ id: bp.id, verified: bp.verified, line: bp.line, message: bp.message });
+}
+
+/**
+ * Watch every xretrocode session's adapter traffic. Registration reaches VS
+ * Code asynchronously, so the suite runner calls this once and lets it
+ * settle before the first session — a session started straight after
+ * registering can go untracked.
+ */
 export function installTracker(): void {
   tracker ??= vscode.debug.registerDebugAdapterTrackerFactory('xretrocode', {
     createDebugAdapterTracker: () => ({
       onDidSendMessage: (message: DapMessage) => {
-        if (message.type === 'event') record(message);
+        if (message.type === 'event') {
+          if (message.event === 'breakpoint') noteBreakpoint(message.body?.breakpoint);
+          record(message);
+        } else if (message.type === 'response' && message.command === 'setBreakpoints') {
+          for (const bp of message.body?.breakpoints ?? []) noteBreakpoint(bp);
+        }
       },
     }),
   });

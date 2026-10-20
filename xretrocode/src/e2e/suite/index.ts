@@ -3,8 +3,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import Mocha from 'mocha';
+import { installTracker } from './helpers';
 
-export function run(): Promise<void> {
+export async function run(): Promise<void> {
+  // Watch adapter traffic before the first session starts (see installTracker)
+  installTracker();
+  await new Promise(r => setTimeout(r, 1000));
+
   const mocha = new Mocha({ ui: 'bdd', timeout: 60_000, color: true });
   for (const file of fs.readdirSync(__dirname)) {
     if (file.endsWith('.e2e.js')) mocha.addFile(path.join(__dirname, file));

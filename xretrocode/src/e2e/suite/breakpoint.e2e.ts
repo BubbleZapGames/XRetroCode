@@ -1,8 +1,8 @@
 // Breakpoints in green.r65, set before and during a session.
 import * as assert from 'assert';
 import {
-  LINES, breakAt, cleanUp, inGreenSource, installTracker, mark, runTo, staysRunning,
-  startSession, topFrame, waitForStopped,
+  LINES, SOURCE, breakAt, breakpointReports, cleanUp, eventually, inGreenSource, installTracker,
+  latestBreakpointReports, mark, runTo, staysRunning, startSession, topFrame, waitForStopped,
 } from './helpers';
 
 describe('Breakpoints', () => {
@@ -13,8 +13,14 @@ describe('Breakpoints', () => {
     const { session, threadId } = await runTo(LINES.NMI);
     const top = await topFrame(session, threadId);
     assert.strictEqual(top.line, LINES.NMI, `stopped at ${JSON.stringify(top)}`);
-    // The adapter reports the path recorded in green.dbg, not the workspace copy
     assert.ok(inGreenSource(top), `top frame source: ${JSON.stringify(top.source)}`);
+  });
+
+  it('reports stack frames in the workspace file the breakpoint was set in', async () => {
+    const { session, threadId } = await runTo(LINES.NMI);
+    const top = await topFrame(session, threadId);
+    // Not the path recorded in green.dbg when the ROM was built
+    assert.strictEqual(top.source?.path, SOURCE.fsPath);
   });
 
   it('hits the breakpoint again after continue', async () => {
@@ -30,6 +36,11 @@ describe('Breakpoints', () => {
     await startSession({ stopOnEntry: true });
     const stopped = await waitForStopped('entry', since);
     assert.ok(stopped.body.threadId > 0);
+  });
+
+  it('stops at a breakpoint on the first statement after reset', async () => {
+    const { session, threadId } = await runTo(LINES.SNES_INIT);
+    assert.strictEqual((await topFrame(session, threadId)).line, LINES.SNES_INIT);
   });
 
   it('stops on a breakpoint added while running', async () => {
@@ -53,10 +64,67 @@ describe('Breakpoints', () => {
     assert.ok(await staysRunning(since, 1500), 'the NMI line runs every frame, so a stale breakpoint would stop again');
   });
 
-  it('stops when a breakpoint condition is true', async () => {
-    breakAt({ line: LINES.NMI, condition: '1' });
+  it('reports the line a breakpoint on a line without code lands on', async () => {
+    // Line 11 is blank; the next code is the reset handler on line 14
+    const reports = breakpointReports.length;
+    breakAt(11);
     const since = mark();
-    await startSession();
+    await startSession({ stopOnEntry: true });
+    await waitForStopped('entry', since);
+    assert.ok(await eventually(() => latestBreakpointReports(reports).some(r => r.verified && r.line === 14)),
+      JSON.stringify(latestBreakpointReports(reports)));
+  });
+
+  describe('with a condition', () => {
+    it('stops when it is true', async () => {
+      breakAt({ line: LINES.NMI, condition: '1' });
+      const since = mark();
+      await startSession();
+      await waitForStopped('breakpoint', since);
+    });
+
+    it('never stops when it is false', async () => {
+      breakAt({ line: LINES.NMI, condition: '0' });
+      const since = mark();
+      await startSession();
+      assert.ok(await staysRunning(since, 1500), 'the NMI line runs every frame');
+    });
+
+    it('stops when a comparison on a register holds', async () => {
+      breakAt({ line: LINES.NMI, condition: 'pc != 0' });
+      const since = mark();
+      await startSession();
+      await waitForStopped('breakpoint', since);
+    });
+
+    it('reports a condition that does not parse', async () => {
+      const reports = breakpointReports.length;
+      breakAt({ line: LINES.NMI, condition: 'nonsense ((' });
+      const since = mark();
+      await startSession();
+      assert.ok(await eventually(() => latestBreakpointReports(reports)
+        .some(r => !r.verified && (r.message ?? '').includes('Invalid condition'))),
+        JSON.stringify(latestBreakpointReports(reports)));
+      assert.ok(await staysRunning(since, 1000));
+    });
+  });
+
+  it('stops at an instruction breakpoint from the disassembly view', async () => {
+    // Find the NMI handler's address by stopping there once
+    const { session, threadId } = await runTo(LINES.NMI);
+    const address = (await topFrame(session, threadId)).instructionPointerReference!;
+
+    // Leave only an instruction breakpoint on it
+    breakAt();
+    await new Promise(r => setTimeout(r, 300));
+    const { breakpoints } = await session.customRequest('setInstructionBreakpoints', {
+      breakpoints: [{ instructionReference: address }],
+    });
+    assert.ok(breakpoints[0].verified, JSON.stringify(breakpoints));
+
+    const since = mark();
+    await session.customRequest('continue', { threadId });
     await waitForStopped('breakpoint', since);
+    assert.strictEqual((await topFrame(session, threadId)).instructionPointerReference, address);
   });
 });
