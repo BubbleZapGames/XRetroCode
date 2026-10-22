@@ -121,6 +121,12 @@ launch configuration:
 | `headless` | `false` | Run without the game window |
 | `mesenDapPath` | auto | Path to `mesen-gdb`, overriding the setting |
 
+The game window plays with your installed Mesen's settings: keys and gamepads,
+video, audio and console options, from MesenCE or else Mesen2. Change them in
+Mesen. For a portable Mesen, set `xretrocode.mesenFolder`. A `headless` session
+uses built-in defaults. See
+[Settings](https://github.com/BubbleZapGames/Mesen-GDB#settings) in Mesen-GDB.
+
 ## Debugging C
 
 Any C project works if its build leaves three things: a Makefile (run before
@@ -210,6 +216,7 @@ For the C/C++ extension, the same in `.vscode/c_cpp_properties.json`:
 | Setting | Default | Description |
 |---|---|---|
 | `xretrocode.mesenDapPath` | `""` | Path to `mesen-gdb` |
+| `xretrocode.mesenFolder` | `""` | Folder of a portable Mesen's `settings.json`. Empty: MesenCE's, then Mesen2's, in their usual places |
 | `xretrocode.buildBeforeLaunch` | `true` | Run `make` before each debug session when the folder has a makefile |
 | `r65.compilerPath` | `r65c` | R65 compiler |
 | `r65.includePaths` | `[]` | Extra include search paths |

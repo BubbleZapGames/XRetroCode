@@ -29,6 +29,15 @@ describe('DebugAdapterDescriptorFactory', () => {
       assert.deepStrictEqual(headless.args, ['--dap', '--headless']);
     });
 
+    it('should pass the Mesen folder setting to a session with a window', () => {
+      workspace._setConfig('xretrocode.mesenFolder', '/portable/Mesen');
+      const windowed = factory.createDebugAdapterDescriptor({ configuration: {} } as any, undefined) as any;
+      assert.deepStrictEqual(windowed.args, ['--dap', '--mesen-folder', '/portable/Mesen']);
+      // Headless sessions don't read Mesen's settings
+      const headless = factory.createDebugAdapterDescriptor({ configuration: { headless: true } } as any, undefined) as any;
+      assert.deepStrictEqual(headless.args, ['--dap', '--headless']);
+    });
+
     it('should use config path when set', () => {
       workspace._setConfig('xretrocode.mesenDapPath', '/custom/path/mesen-gdb');
       const result = factory.createDebugAdapterDescriptor({} as any, undefined) as any;

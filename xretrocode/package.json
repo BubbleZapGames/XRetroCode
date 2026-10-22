@@ -285,6 +285,11 @@
           "default": "",
           "description": "Path to mesen-dap executable"
         },
+        "xretrocode.mesenFolder": {
+          "type": "string",
+          "default": "",
+          "description": "The folder of a Mesen settings.json, for a portable Mesen. A debug session with a game window uses its key, video, audio and console settings. Empty: MesenCE's folder, then Mesen2's, in their usual places."
+        },
         "xretrocode.buildBeforeLaunch": {
           "type": "boolean",
           "default": true,

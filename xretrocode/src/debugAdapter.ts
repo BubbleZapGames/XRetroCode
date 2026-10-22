@@ -138,7 +138,14 @@ export class DebugAdapterDescriptorFactory implements vscode.DebugAdapterDescrip
         // Fall through to a bare name so a binary on PATH still works
         const mesenDapPath = locateMesenGdb(session) ?? MESEN_BINARY_NAME;
         // Headless: no game window — for CI, remote sessions and tests
-        const args = session?.configuration?.headless ? ['--dap', '--headless'] : ['--dap'];
+        const headless = !!session?.configuration?.headless;
+        const args = headless ? ['--dap', '--headless'] : ['--dap'];
+        // A session with a window uses Mesen's settings; a portable Mesen's
+        // aren't where mesen-gdb looks by itself
+        const mesenFolder = vscode.workspace.getConfiguration('xretrocode').get<string>('mesenFolder');
+        if(!headless && mesenFolder) {
+            args.push('--mesen-folder', mesenFolder);
+        }
         return new vscode.DebugAdapterExecutable(mesenDapPath, args);
     }
 }
