@@ -134,8 +134,7 @@
       {
         "command": "xretrocode.goToMacroDefinition",
         "title": "Go to Macro Definition",
-        "category": "XRetroCode",
-        "icon": "$(symbol-misc)"
+        "category": "XRetroCode"
       },
       {
         "command": "xretrocode.stepIntoMacro",
@@ -156,12 +155,6 @@
       }
     ],
     "menus": {
-      "debug/toolbar": [
-        {
-          "command": "xretrocode.goToMacroDefinition",
-          "when": "debugType == 'xretrocode' && xretrocode.stoppedOnMacro"
-        }
-      ],
       "editor/context": [
         {
           "command": "xretrocode.goToMacroDefinition",

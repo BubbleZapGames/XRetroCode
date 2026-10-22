@@ -6,7 +6,6 @@ import { nearestCopy } from './definitionProvider';
 
 export const GO_TO_MACRO_COMMAND = 'xretrocode.goToMacroDefinition';
 export const STEP_INTO_MACRO_COMMAND = 'xretrocode.stepIntoMacro';
-const CONTEXT_KEY = 'xretrocode.stoppedOnMacro';
 // While set, F11 goes to the macro definition instead of stepping: once per stop
 const STEP_INTO_CONTEXT_KEY = 'xretrocode.stepIntoMacro';
 
@@ -83,7 +82,7 @@ export class MacroDefinitionAid implements vscode.Disposable {
   private statusItem: vscode.StatusBarItem;
   private current: StoppedOnMacros | undefined;
   // Stopped on a line with no macros: the stop, not the cursor, is what the
-  // toolbar or palette command is about
+  // palette command is about
   private stoppedElsewhere = false;
   // Each stop bumps this, so a slow lookup for an older stop is dropped
   private stopSeq = 0;
@@ -143,7 +142,6 @@ export class MacroDefinitionAid implements vscode.Disposable {
   private show(stop: StoppedOnMacros | undefined, stopped = false): void {
     this.current = stop;
     this.stoppedElsewhere = stopped && !stop;
-    void vscode.commands.executeCommand('setContext', CONTEXT_KEY, !!stop);
     void vscode.commands.executeCommand('setContext', STEP_INTO_CONTEXT_KEY, !!stop && !stop.steppedIn);
     if (!stop) {
       this.statusItem.hide();
@@ -232,7 +230,6 @@ export class MacroDefinitionAid implements vscode.Disposable {
 
   dispose(): void {
     void vscode.commands.executeCommand('setContext', STEP_INTO_CONTEXT_KEY, false);
-    void vscode.commands.executeCommand('setContext', CONTEXT_KEY, false);
     for (const d of this.disposables) d.dispose();
     this.disposables = [];
   }

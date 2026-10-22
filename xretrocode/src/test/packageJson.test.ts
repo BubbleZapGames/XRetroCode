@@ -169,6 +169,15 @@ describe('package.json', () => {
         }
     });
 
+    it('should only use menu ids VS Code recognises', () => {
+        // Menu ids are case-sensitive and an unknown one is silently ignored:
+        // "debug/toolbar" (for "debug/toolBar") hid every toolbar button
+        const known = ['commandPalette', 'debug/toolBar', 'editor/context', 'editor/title', 'view/title', 'view/item/context'];
+        for (const id of Object.keys(pkg.contributes.menus)) {
+            assert.ok(known.includes(id), `unrecognised menu id: ${id}`);
+        }
+    });
+
     it('should declare both language and debugger categories', () => {
         assert.ok(pkg.categories.includes('Programming Languages'));
         assert.ok(pkg.categories.includes('Debuggers'));
