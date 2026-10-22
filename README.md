@@ -137,7 +137,7 @@ launch configuration:
 | Attribute | Default | Description |
 |---|---|---|
 | `romPath` | prompt | ROM to load. If empty or `${command:xretrocode.pickRom}`, you are prompted to choose one. |
-| `dbgPath` | auto | Symbol file: a `.dbg` (R65, cc65) or a WLA-DX `.sym`. Defaults to the ROM name with `.dbg`, then with `.sym`, then `<rom dir>/main.dbg`. |
+| `dbgPath` | auto | Symbol file: a `.dbg` (R65, cc65) or a WLA-DX `.sym`. Defaults to the newest `.dbg` in the ROM's folder, else the newest `.sym` there. |
 | `stopOnEntry` | `false` | Break at the entry point instead of running |
 | `headless` | `false` | Run without the game window |
 | `mesenDapPath` | auto | Path to `mesen-gdb`, overriding the setting |

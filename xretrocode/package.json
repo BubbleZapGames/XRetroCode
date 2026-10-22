@@ -203,7 +203,7 @@
               },
               "dbgPath": {
                 "type": "string",
-                "description": "Path to the symbol file: a cc65/ld65 .dbg (R65 and cc65 C) or a WLA-DX .sym (wlalink -S; add -A for source lines). Defaults to the ROM name with .dbg, then with .sym, then <rom dir>/main.dbg.",
+                "description": "Path to the symbol file: a cc65/ld65 .dbg (R65 and cc65 C) or a WLA-DX .sym (wlalink -S; add -A for source lines). Defaults to the newest .dbg in the ROM's folder, else the newest .sym there.",
                 "default": ""
               }
             }
