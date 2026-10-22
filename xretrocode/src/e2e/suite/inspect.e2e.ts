@@ -28,12 +28,12 @@ describe('Pause and inspection', () => {
     assert.ok(await staysRunning(resumed, 500), 'continue should leave it running');
   });
 
-  it('lists the SNES CPU and the sound CPU as threads', async () => {
+  it('lists the SNES CPU as a thread, but not the sound CPU yet', async () => {
     const { session } = await runTo(LINES.NMI);
     const { threads } = await session.customRequest('threads');
     const names = threads.map((t: { name: string }) => t.name);
     assert.ok(names.includes('SNES 65816'), JSON.stringify(names));
-    assert.ok(names.includes('SNES SPC700'), JSON.stringify(names));
+    assert.ok(!names.includes('SNES SPC700'), JSON.stringify(names));
   });
 
   it('shows the program counter in the registers and to evaluate', async () => {

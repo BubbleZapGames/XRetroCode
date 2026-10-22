@@ -32,7 +32,7 @@ XRetroCode enables real-time source-level debugging of retro console games throu
 3. **Direct C++ API access** — calls Debugger/Emulator classes directly, not through InteropDLL C exports
 4. **Custom minimal JSON library** — DAP messages are structurally simple; avoids large nlohmann/json dependency
 5. **Port .dbg parser from C# to C++** — source-level debugging requires address↔source line mapping
-6. **CpuType maps to DAP thread** — each active CPU (e.g., SNES 65816 + SPC700) is a separate DAP thread
+6. **CpuType maps to DAP thread** — each active CPU is a separate DAP thread, except the SPC700 (its call stack doesn't work yet; `IsHiddenThread` in DapServer.cpp)
 
 ## Project Structure
 
