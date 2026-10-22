@@ -114,6 +114,8 @@ terminal:
   `wla-65816` and `wlalink` on your `PATH`.
 - R65: `pipx install git+https://github.com/BubbleZapGames/R65.git@release`,
   or `python3 -m pip install --user ...` (`py -m pip` on Windows) without pipx.
+  With neither pipx nor a Python that has pip, it links to
+  [python.org](https://www.python.org/downloads/) to install Python.
 
 **Don't Ask Again** turns the prompt off; **XRetroCode: Install R65
 Toolchain** in the Command Palette runs the install any time.

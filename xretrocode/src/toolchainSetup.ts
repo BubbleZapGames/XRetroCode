@@ -2,12 +2,15 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { execFileSync } from 'child_process';
 import { getConfig } from './config';
 import { findOnPath } from './findOnPath';
 
 /** What r65.dev's setup guide has pip install. */
 export const R65_PIP_SOURCE = 'git+https://github.com/BubbleZapGames/R65.git@release';
 export const SETUP_DOCS_URL = 'https://r65.dev/docs/getting-started/setup';
+/** Its installers include pip, which R65's install needs without pipx. */
+export const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/';
 /** Prebuilt WLA-DX, for machines without Homebrew. */
 export const WLA_RELEASES_URL = 'https://github.com/vhelin/wla-dx/releases';
 export const WLA_TOOLS = ['wla-65816', 'wlalink'];
@@ -66,7 +69,7 @@ export interface InstallPlan {
     steps: InstallStep[];
     /** No Homebrew: WLA-DX has to be downloaded by hand */
     needsManualWla: boolean;
-    /** No pipx and no Python to run pip with */
+    /** No pipx, and no Python with pip */
     needsPython: boolean;
 }
 
@@ -75,16 +78,38 @@ export interface Installers {
     brew?: string;
     pipx?: string;
     python?: string;
+    /** Whether python has pip; Debian and Ubuntu's python3 doesn't */
+    hasPip?: boolean;
     /** In a virtualenv, where pip refuses --user */
     inVirtualEnv?: boolean;
 }
 
+/** Windows' python.exe placeholder, which opens the Microsoft Store */
+export function isWindowsStoreStub(p: string): boolean {
+    return /[\\/]WindowsApps[\\/]/i.test(p);
+}
+
+function hasPip(python: string): boolean {
+    try {
+        execFileSync(python, ['-m', 'pip', '--version'], { timeout: 5000, stdio: 'ignore' });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export function findInstallers(platform: NodeJS.Platform = process.platform): Installers {
     const pythons = platform === 'win32' ? ['py', 'python'] : ['python3', 'python'];
+    const pipx = findTool('pipx');
+    const python = pythons
+        .map(p => findOnPath(p))
+        .find((p): p is string => !!p && !isWindowsStoreStub(p));
     return {
         brew: platform === 'win32' ? undefined : findTool('brew'),
-        pipx: findTool('pipx'),
-        python: pythons.map(p => findOnPath(p)).find(p => p),
+        pipx,
+        python,
+        // Only asked when pip is what would install R65
+        hasPip: !pipx && python ? hasPip(python) : undefined,
         inVirtualEnv: !!process.env.VIRTUAL_ENV,
     };
 }
@@ -107,7 +132,7 @@ export function installPlan(status: ToolchainStatus, installers: Installers): In
         // pipx works where the system Python refuses pip installs (PEP 668)
         if(installers.pipx) {
             steps.push({ label: 'R65', command: installers.pipx, args: ['install', R65_PIP_SOURCE] });
-        } else if(installers.python) {
+        } else if(installers.python && installers.hasPip) {
             const user = installers.inVirtualEnv ? [] : ['--user'];
             steps.push({
                 label: 'R65',
@@ -153,21 +178,27 @@ async function runStep(step: InstallStep): Promise<number | undefined> {
 export async function installToolchain(status: ToolchainStatus = checkToolchain()): Promise<void> {
     const plan = installPlan(status, findInstallers());
 
-    let failed: string | undefined;
+    // One failure doesn't stop the rest: WLA-DX and R65 install separately
+    const failed: string[] = [];
+    const succeeded = new Set<string>();
     for(const step of plan.steps) {
         const exitCode = await runStep(step);
-        if(exitCode !== 0) {
-            failed = step.label;
-            break;
+        if(exitCode === 0) {
+            succeeded.add(step.label);
+        } else {
+            failed.push(step.label);
         }
     }
 
     if(plan.needsPython) {
+        const PYTHON = 'Install Python';
         const GUIDE = 'Setup Guide';
         const choice = await vscode.window.showErrorMessage(
-            'Installing R65 needs Python 3 (with pip) or pipx. Install Python, then run "XRetroCode: Install R65 Toolchain" again.',
+            'Installing R65 needs Python 3.10+ with pip. Install Python, then run "XRetroCode: Install R65 Toolchain" again.',
+            PYTHON,
             GUIDE
         );
+        if(choice === PYTHON) await vscode.env.openExternal(vscode.Uri.parse(PYTHON_DOWNLOAD_URL));
         if(choice === GUIDE) await vscode.env.openExternal(vscode.Uri.parse(SETUP_DOCS_URL));
     }
 
@@ -180,29 +211,27 @@ export async function installToolchain(status: ToolchainStatus = checkToolchain(
         if(choice === DOWNLOAD) await vscode.env.openExternal(vscode.Uri.parse(WLA_RELEASES_URL));
     }
 
-    if(failed) {
+    if(failed.length > 0) {
         const GUIDE = 'Setup Guide';
         const choice = await vscode.window.showErrorMessage(
-            `Installing ${failed} failed. See the terminal for why.`,
+            `Installing ${failed.join(' and ')} failed. See the terminal for why.`,
             GUIDE
         );
         if(choice === GUIDE) await vscode.env.openExternal(vscode.Uri.parse(SETUP_DOCS_URL));
-        return;
     }
-    if(plan.steps.length === 0) {
+    if(succeeded.size === 0) {
         return;
     }
 
     const after = checkToolchain();
-    if(after.r65c && after.wla) {
+    if(failed.length === 0 && after.r65c && after.wla) {
         void vscode.window.showInformationMessage('The R65 toolchain is installed.');
         return;
     }
     // Installed, but VS Code's PATH doesn't reach it
-    const installed = new Set(plan.steps.map(step => step.label));
     const offPath = [
-        ...(installed.has('R65') && !after.r65c ? ['r65c'] : []),
-        ...(installed.has('WLA-DX') && !after.wla ? WLA_TOOLS : []),
+        ...(succeeded.has('R65') && !after.r65c ? ['r65c'] : []),
+        ...(succeeded.has('WLA-DX') && !after.wla ? WLA_TOOLS : []),
     ].map(name => findInDirs(name, extraDirs()) ?? name);
     if(offPath.length > 0) {
         void vscode.window.showWarningMessage(

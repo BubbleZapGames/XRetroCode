@@ -5,8 +5,8 @@ import * as path from 'path';
 import { workspace, window, tasks, env } from './vscode-mock';
 import { findOnPath } from '../findOnPath';
 import {
-  checkToolchain, installPlan, promptIfMissing, registerToolchainCheck,
-  DISMISSED_KEY, R65_PIP_SOURCE, SETUP_DOCS_URL,
+  checkToolchain, installPlan, isWindowsStoreStub, promptIfMissing, registerToolchainCheck,
+  DISMISSED_KEY, PYTHON_DOWNLOAD_URL, R65_PIP_SOURCE, SETUP_DOCS_URL,
 } from '../toolchainSetup';
 
 const NOTHING = { r65c: false, wla: false };
@@ -44,7 +44,7 @@ describe('installPlan', () => {
   });
 
   it('falls back to pip --user, and a WLA-DX download, without pipx or brew', () => {
-    const plan = installPlan(NOTHING, { python: '/usr/bin/python3' });
+    const plan = installPlan(NOTHING, { python: '/usr/bin/python3', hasPip: true });
     assert.deepStrictEqual(plan.steps.map(s => [s.command, ...s.args]), [
       ['/usr/bin/python3', '-m', 'pip', 'install', '--user', R65_PIP_SOURCE],
     ]);
@@ -52,13 +52,13 @@ describe('installPlan', () => {
   });
 
   it('uses the py launcher on Windows', () => {
-    const plan = installPlan({ r65c: false, wla: true }, { python: 'C:\\Windows\\py.exe' });
+    const plan = installPlan({ r65c: false, wla: true }, { python: 'C:\\Windows\\py.exe', hasPip: true });
     assert.deepStrictEqual(plan.steps[0].args, ['-m', 'pip', 'install', '--user', R65_PIP_SOURCE]);
     assert.strictEqual(plan.steps[0].command, 'C:\\Windows\\py.exe');
   });
 
   it('leaves out --user in a virtualenv', () => {
-    const plan = installPlan({ r65c: false, wla: true }, { python: '/venv/bin/python3', inVirtualEnv: true });
+    const plan = installPlan({ r65c: false, wla: true }, { python: '/venv/bin/python3', hasPip: true, inVirtualEnv: true });
     assert.deepStrictEqual(plan.steps[0].args, ['-m', 'pip', 'install', R65_PIP_SOURCE]);
   });
 
@@ -73,6 +73,17 @@ describe('installPlan', () => {
     const plan = installPlan({ r65c: false, wla: true }, {});
     assert.deepStrictEqual(plan.steps, []);
     assert.strictEqual(plan.needsPython, true);
+  });
+
+  it('asks for Python when its python has no pip', () => {
+    const plan = installPlan({ r65c: false, wla: true }, { python: '/usr/bin/python3', hasPip: false });
+    assert.deepStrictEqual(plan.steps, []);
+    assert.strictEqual(plan.needsPython, true);
+  });
+
+  it('passes over the Microsoft Store python placeholder', () => {
+    assert.ok(isWindowsStoreStub('C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe'));
+    assert.ok(!isWindowsStoreStub('C:\\Python312\\python.exe'));
   });
 });
 
@@ -187,6 +198,29 @@ describe('toolchain prompt', () => {
     await promptIfMissing(makeContext() as any);
     assert.ok(window._messages.some(m => m.includes('Installing R65 failed')));
   });
+
+  it('keeps installing after a failed step, and reports each failure', async () => {
+    fakePath(['brew', 'pipx']);
+    tasks._setExitCode(1);
+    window._setWarningMessageChoice('Install');
+    await promptIfMissing(makeContext() as any);
+    assert.deepStrictEqual(tasks._executed.map(t => t.name), ['install WLA-DX', 'install R65']);
+    assert.ok(window._messages.some(m => m.includes('Installing WLA-DX and R65 failed')));
+  });
+
+  if (process.platform !== 'win32') {
+    it('sends a Python without pip to python.org', async () => {
+      // A python3 whose `-m pip --version` fails
+      const dir = fakePath(['wla-65816', 'wlalink']);
+      fs.writeFileSync(path.join(dir, 'python3'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+      window._setWarningMessageChoice('Install');
+      window._setErrorMessageChoice('Install Python');
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(tasks._executed.length, 0);
+      assert.ok(window._messages.some(m => m.includes('needs Python 3.10+ with pip')));
+      assert.deepStrictEqual(env._opened.map(u => u.path), [PYTHON_DOWNLOAD_URL]);
+    });
+  }
 
   it('checks on the first R65 document opened', async () => {
     const context = makeContext();
