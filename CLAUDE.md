@@ -201,7 +201,7 @@ xretrocode/
 ./setup.sh
 
 # Build mesen-dap (headless DAP binary)
-cd Mesen-GDB && make dap -j$(nproc)
+cd Mesen-GDB && make -j$(nproc)
 
 # Build VSCode extension
 cd xretrocode && npm install && npm run compile
