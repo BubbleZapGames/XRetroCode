@@ -20,7 +20,7 @@ describe('ConfigurationProvider', () => {
       assert.strictEqual(configs.length, 1);
       assert.strictEqual(configs[0].type, 'xretrocode');
       assert.strictEqual(configs[0].request, 'launch');
-      assert.strictEqual(configs[0].stopOnEntry, true);
+      assert.strictEqual(configs[0].stopOnEntry, false);
     });
 
     it('should include romPath in default config', () => {

@@ -4,8 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
-  WORKSPACE, ROM, adapterPids, cleanUp, newAdapterPids, eventually, installTracker, mark, startSession,
-  tryStartSession, waitForStopped,
+  WORKSPACE, ROM, LINES, adapterPids, baseConfig, breakAt, cleanUp, newAdapterPids, eventually, installTracker,
+  mark, startSession, staysRunning, tryStartSession, waitForEvent, waitForStopped,
 } from './helpers';
 
 const MAKEFILE = path.join(WORKSPACE, 'Makefile');
@@ -29,6 +29,26 @@ describe('Launching through the extension', () => {
     const session = await startSession({ romPath: undefined, stopOnEntry: true });
     await waitForStopped('entry', since);
     assert.strictEqual(session.configuration.romPath, ROM);
+  });
+
+  it('runs without stopping when stopOnEntry is left out', async () => {
+    const since = mark();
+    await startSession({ stopOnEntry: undefined });
+    await waitForEvent(e => e.event === 'initialized', 'initialized', since);
+    assert.ok(await staysRunning(since, 3_000), 'the game stopped with no breakpoints and no stopOnEntry');
+  });
+
+  it('runs without debugging: no stop on entry, breakpoints ignored', async () => {
+    // A line that runs every frame, and stopOnEntry left on: either would
+    // freeze the game, with no Continue button to get it going again
+    breakAt(LINES.NMI);
+    const since = mark();
+    const ok = await vscode.debug.startDebugging(
+      vscode.workspace.workspaceFolders![0], { ...baseConfig(), stopOnEntry: true }, { noDebug: true }
+    );
+    assert.ok(ok, 'startDebugging refused the launch configuration');
+    await waitForEvent(e => e.event === 'initialized', 'initialized', since);
+    assert.ok(await staysRunning(since, 3_000), 'the game stopped in a Run Without Debugging session');
   });
 
   it('reports a ROM that fails to load and leaves nothing running', async () => {

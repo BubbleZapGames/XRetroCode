@@ -109,8 +109,7 @@ launch configuration:
   "name": "Launch ROM",
   "type": "xretrocode",
   "request": "launch",
-  "romPath": "${workspaceFolder}/build/game.sfc",
-  "stopOnEntry": true
+  "romPath": "${workspaceFolder}/build/game.sfc"
 }
 ```
 
@@ -118,7 +117,7 @@ launch configuration:
 |---|---|---|
 | `romPath` | prompt | ROM to load. If empty or `${command:xretrocode.pickRom}`, you are prompted to choose one. |
 | `dbgPath` | auto | Symbol file: a `.dbg` (R65, cc65) or a WLA-DX `.sym`. Defaults to the ROM name with `.dbg`, then with `.sym`, then `<rom dir>/main.dbg`. |
-| `stopOnEntry` | `true` | Break at the entry point |
+| `stopOnEntry` | `false` | Break at the entry point instead of running |
 | `headless` | `false` | Run without the game window |
 | `mesenDapPath` | auto | Path to `mesen-gdb`, overriding the setting |
 

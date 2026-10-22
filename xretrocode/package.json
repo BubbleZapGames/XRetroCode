@@ -181,8 +181,8 @@
               },
               "stopOnEntry": {
                 "type": "boolean",
-                "description": "Stop on entry point",
-                "default": true
+                "description": "Break at the entry point instead of running",
+                "default": false
               },
               "mesenDapPath": {
                 "type": "string",
@@ -208,7 +208,7 @@
             "type": "xretrocode",
             "request": "launch",
             "romPath": "${command:xretrocode.pickRom}",
-            "stopOnEntry": true
+            "stopOnEntry": false
           }
         ],
         "languages": [
@@ -226,7 +226,7 @@
               "type": "xretrocode",
               "request": "launch",
               "romPath": "^\"\\${command:xretrocode.pickRom}\"",
-              "stopOnEntry": true
+              "stopOnEntry": false
             }
           }
         ]

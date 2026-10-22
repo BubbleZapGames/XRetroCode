@@ -119,7 +119,8 @@ describe('ConfigurationProvider ROM resolution', () => {
     const result = await provider.resolveDebugConfiguration(undefined, {} as any) as any;
     assert.strictEqual(result.type, 'xretrocode');
     assert.strictEqual(result.request, 'launch');
-    assert.strictEqual(result.stopOnEntry, true);
+    // Left out: the adapter runs without stopping unless asked
+    assert.strictEqual(result.stopOnEntry, undefined);
     assert.strictEqual(result.romPath, '/test/build/game.sfc');
   });
 

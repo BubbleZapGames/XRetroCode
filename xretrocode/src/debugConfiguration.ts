@@ -12,7 +12,7 @@ export class ConfigurationProvider implements vscode.DebugConfigurationProvider 
                 type: "xretrocode",
                 request: "launch",
                 romPath: "${command:xretrocode.pickRom}",
-                stopOnEntry: true
+                stopOnEntry: false
             }
         ];
     }
@@ -61,9 +61,6 @@ export class ConfigurationProvider implements vscode.DebugConfigurationProvider 
             debugConfiguration.type = 'xretrocode';
             debugConfiguration.request = 'launch';
             debugConfiguration.name = 'Launch ROM';
-            if(debugConfiguration.stopOnEntry === undefined) {
-                debugConfiguration.stopOnEntry = true;
-            }
         }
 
         // Surface a missing adapter here, where we can offer to fix it, rather

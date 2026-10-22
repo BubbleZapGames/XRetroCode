@@ -98,10 +98,10 @@ describe('package.json', () => {
         assert.strictEqual(initial.romPath, '${command:xretrocode.pickRom}');
     });
 
-    it('should define stopOnEntry as boolean defaulting to true', () => {
+    it('should define stopOnEntry as boolean defaulting to false', () => {
         const props = pkg.contributes.debuggers[0].configurationAttributes.launch.properties;
         assert.strictEqual(props.stopOnEntry.type, 'boolean');
-        assert.strictEqual(props.stopOnEntry.default, true);
+        assert.strictEqual(props.stopOnEntry.default, false);
     });
 
     it('should define mesenDapPath as an optional string', () => {
