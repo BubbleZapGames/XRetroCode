@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { findOnPath } from './findOnPath';
 
 export const MESEN_BINARY_NAME = 'mesen-gdb';
 
@@ -25,19 +26,6 @@ function buildCandidates(root: string): string[] {
         }
     }
     return out;
-}
-
-function searchPathEnv(): string | undefined {
-    const raw = process.env.PATH;
-    if(!raw) return undefined;
-    for(const dir of raw.split(path.delimiter)) {
-        if(!dir) continue;
-        const candidate = path.join(dir, MESEN_BINARY_NAME);
-        if(fs.existsSync(candidate)) {
-            return candidate;
-        }
-    }
-    return undefined;
 }
 
 /**
@@ -82,7 +70,7 @@ export function locateMesenGdb(session?: vscode.DebugSession): string | undefine
         }
     }
 
-    const onPath = searchPathEnv();
+    const onPath = findOnPath(MESEN_BINARY_NAME);
     if(onPath) {
         return onPath;
     }

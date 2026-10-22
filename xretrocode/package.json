@@ -22,7 +22,8 @@
     "onLanguage:r65",
     "workspaceContains:**/*.r65",
     "onDebugResolve:xretrocode",
-    "onDebugInitialConfigurations"
+    "onDebugInitialConfigurations",
+    "onCommand:xretrocode.setupToolchain"
   ],
   "main": "./out/main.js",
   "contributes": {
@@ -139,6 +140,11 @@
       {
         "command": "xretrocode.stepIntoMacro",
         "title": "Step Into (Macro Definition)",
+        "category": "XRetroCode"
+      },
+      {
+        "command": "xretrocode.setupToolchain",
+        "title": "Install R65 Toolchain",
         "category": "XRetroCode"
       }
     ],
@@ -290,6 +296,11 @@
           "type": "string",
           "default": "",
           "description": "The folder of a Mesen settings.json, for a portable Mesen. A debug session with a game window uses its key, video, audio and console settings. Empty: MesenCE's folder, then Mesen2's, in their usual places."
+        },
+        "xretrocode.checkToolchain": {
+          "type": "boolean",
+          "default": true,
+          "description": "When an R65 file is opened, offer to install the r65c compiler and WLA-DX if they're missing."
         },
         "xretrocode.buildBeforeLaunch": {
           "type": "boolean",

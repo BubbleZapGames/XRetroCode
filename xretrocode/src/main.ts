@@ -12,6 +12,7 @@ import { MacroDefinitionAid } from './macroDefinitionAid';
 import { DebugAdapterDescriptorFactory, setExtensionPath } from './debugAdapter';
 import { ConfigurationProvider } from './debugConfiguration';
 import { pickRom } from './romLocator';
+import { registerToolchainCheck } from './toolchainSetup';
 
 let taskProvider: vscode.Disposable | undefined;
 
@@ -22,7 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // R65 language: tasks, symbol index, go-to-definition, outline, hover,
-// completion, references, workspace symbols
+// completion, references, workspace symbols, toolchain setup
 function activateLanguage(context: vscode.ExtensionContext) {
     taskProvider = vscode.tasks.registerTaskProvider('r65', new R65TaskProvider());
     context.subscriptions.push(taskProvider);
@@ -54,6 +55,8 @@ function activateLanguage(context: vscode.ExtensionContext) {
     );
     // The debugger steps over macros; offer their definitions when stopped on one
     context.subscriptions.push(new MacroDefinitionAid(symbolIndex));
+    // Offer to install r65c and WLA-DX when an R65 file is opened without them
+    registerToolchainCheck(context);
 }
 
 // Mesen-GDB debug adapter

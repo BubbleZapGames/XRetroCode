@@ -93,6 +93,17 @@ describe('package.json', () => {
         assert.ok(pkg.contributes.commands.some((c: any) => c.command === 'xretrocode.pickRom'));
     });
 
+    it('should contribute the setupToolchain command, usable before activation', () => {
+        assert.ok(pkg.contributes.commands.some((c: any) => c.command === 'xretrocode.setupToolchain'));
+        assert.ok(pkg.activationEvents.includes('onCommand:xretrocode.setupToolchain'));
+    });
+
+    it('should define the xretrocode.checkToolchain setting, on by default', () => {
+        const prop = pkg.contributes.configuration.properties['xretrocode.checkToolchain'];
+        assert.strictEqual(prop.type, 'boolean');
+        assert.strictEqual(prop.default, true);
+    });
+
     it('should default romPath to the pickRom command', () => {
         const initial = pkg.contributes.debuggers[0].initialConfigurations[0];
         assert.strictEqual(initial.romPath, '${command:xretrocode.pickRom}');

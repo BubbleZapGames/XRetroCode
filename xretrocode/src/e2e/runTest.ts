@@ -64,6 +64,8 @@ function makeWorkspace(root: string): string {
     path.join(workspace, '.vscode', 'settings.json'),
     JSON.stringify({
       'xretrocode.buildBeforeLaunch': false,
+      // No install prompt over the tests, whatever this machine has installed
+      'xretrocode.checkToolchain': false,
       // ROM discovery should find green.sfc alone: a launch with no romPath
       // picks the workspace's only ROM without asking
       'files.exclude': { 'hello_c/*.nes': true, 'hello_asm/*.nes': true },

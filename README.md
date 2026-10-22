@@ -42,6 +42,8 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
 - Go to Definition, Find All References, hover, completion, the Outline view and
   workspace symbol search (Ctrl+T)
 - `r65c` build and check tasks with a problem matcher
+- Toolchain setup: opening an `.r65` file without `r65c` or WLA-DX offers to
+  install them (below)
 
 ## Repository layout
 
@@ -98,6 +100,23 @@ choose **Install from VSIX...**. The package doesn't include `mesen-gdb`.
 Install that separately, as described in step 1.
 
 To run the extension in development, open `xretrocode/` in VS Code and press F5.
+
+### 3. The R65 toolchain
+
+Building R65 needs the `r65c` compiler and WLA-DX (`wla-65816`, `wlalink`).
+When you open an `.r65` file and either is missing from `PATH`, the extension
+offers to install it, running the
+[setup guide](https://r65.dev/docs/getting-started/setup)'s commands in a
+terminal:
+
+- WLA-DX: `brew install wla-dx`. Without Homebrew it links to the
+  [WLA-DX releases](https://github.com/vhelin/wla-dx/releases) instead; put
+  `wla-65816` and `wlalink` on your `PATH`.
+- R65: `pipx install git+https://github.com/BubbleZapGames/R65.git@release`,
+  or `python3 -m pip install --user ...` (`py -m pip` on Windows) without pipx.
+
+**Don't Ask Again** turns the prompt off; **XRetroCode: Install R65
+Toolchain** in the Command Palette runs the install any time.
 
 ### 3. Debug a ROM
 
@@ -218,6 +237,7 @@ For the C/C++ extension, the same in `.vscode/c_cpp_properties.json`:
 | `xretrocode.mesenDapPath` | `""` | Path to `mesen-gdb` |
 | `xretrocode.mesenFolder` | `""` | Folder of a portable Mesen's `settings.json`. Empty: MesenCE's, then Mesen2's, in their usual places |
 | `xretrocode.buildBeforeLaunch` | `true` | Run `make` before each debug session when the folder has a makefile |
+| `xretrocode.checkToolchain` | `true` | Offer to install `r65c` and WLA-DX when an `.r65` file is opened without them |
 | `r65.compilerPath` | `r65c` | R65 compiler |
 | `r65.includePaths` | `[]` | Extra include search paths |
 | `r65.targetPlatform` | `snes` | `snes` or `nes` |

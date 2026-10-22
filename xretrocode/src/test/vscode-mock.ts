@@ -24,6 +24,15 @@ export namespace workspace {
     // Open editors' documents, for providers that prefer unsaved text
     export const textDocuments: any[] = [];
 
+    let _openHandlers: ((document: any) => void)[] = [];
+    export function onDidOpenTextDocument(handler: (document: any) => void): any {
+        _openHandlers.push(handler);
+        return { dispose: () => { _openHandlers = _openHandlers.filter(h => h !== handler); } };
+    }
+    export function _openDocument(document: any) {
+        for(const handler of [..._openHandlers]) handler(document);
+    }
+
     export function findFiles(include: string, _exclude?: string): Promise<Uri[]> {
         // Honour the extensions named by the glob: **/*.r65 or **/*.{sfc,smc,...}
         const braces = include.match(/\{([^}]*)\}/);
@@ -64,7 +73,7 @@ export namespace workspace {
     export function _setConfig(key: string, value: any) { _config[key] = value; }
     export function _setFileContent(path: string, content: string) { _fileContents.set(path, content); }
     export function _setWorkspaceFolders(folders: any[] | undefined) { workspaceFolders = folders; }
-    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; textDocuments.length = 0; }
+    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; textDocuments.length = 0; _openHandlers = []; }
 }
 
 export namespace tasks {
@@ -140,7 +149,19 @@ export namespace window {
     }
 
     export function _setErrorMessageChoice(choice: any) { _errorChoice = choice; }
-    export function showInformationMessage(msg: string) { return Promise.resolve(undefined); }
+    export function showInformationMessage(msg: string, ..._items: any[]) {
+        _messages.push(msg);
+        return Promise.resolve(undefined);
+    }
+
+    let _warningChoice: any = undefined;
+    export const _warnings: { msg: string; items: any[] }[] = [];
+    export function showWarningMessage(msg: string, ...items: any[]) {
+        _messages.push(msg);
+        _warnings.push({ msg, items });
+        return Promise.resolve(_warningChoice);
+    }
+    export function _setWarningMessageChoice(choice: any) { _warningChoice = choice; }
 
     // Scripted responses for the ROM picker
     let _quickPickResult: any = undefined;
@@ -164,6 +185,8 @@ export namespace window {
     export function _reset() {
         _messages.length = 0;
         _errorChoice = undefined;
+        _warningChoice = undefined;
+        _warnings.length = 0;
         _quickPickResult = undefined;
         _openDialogResult = undefined;
         _quickPickCalls.length = 0;
