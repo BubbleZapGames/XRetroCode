@@ -81,4 +81,43 @@ describe('Stepping', () => {
     const { top } = await step(session, 'stepIn', stopped.body.threadId);
     assert.ok(inGreenSource(top) && fs.existsSync(top.source!.path!), JSON.stringify(top));
   });
+
+  it('steps one instruction with Step Instruction', async () => {
+    const { session, threadId } = await runTo(LINES.NMI);
+    const pc = parseInt((await topFrame(session, threadId)).instructionPointerReference!, 16);
+    const dis = await session.customRequest('disassemble', { memoryReference: `0x${pc.toString(16)}`, instructionCount: 1 });
+    const first = dis.instructions[0];
+    // clear_nmi!() reads $4210 first: no branch, so the next instruction follows it
+    assert.ok(!/^(B(CC|CS|EQ|MI|NE|PL|RA|RL|VC|VS)|JM[LP]|JS[LR]|RT[ILS])\b/.test(first.instruction), `expected no branch at the NMI line: ${first.instruction}`);
+    const length = first.instructionBytes.split(' ').length;
+
+    const since = mark();
+    await vscode.commands.executeCommand('xretrocode.stepInstruction');
+    await waitForStopped('step', since);
+    const after = parseInt((await topFrame(session, threadId)).instructionPointerReference!, 16);
+    assert.strictEqual(after, pc + length, `${first.instruction} at $${pc.toString(16)}`);
+  });
+
+  it('moves the editor to the next macro once Step Instruction reaches it', async () => {
+    // set_backdrop!(...) then set_brightness!(15): two macro lines in a row
+    const { session, threadId } = await runTo(LINES.MAIN_FIRST);
+    let line = 0;
+    for (let i = 0; i < 40 && line !== LINES.MAIN_SECOND; i++) {
+      const since = mark();
+      await vscode.commands.executeCommand('xretrocode.stepInstruction');
+      await waitForStopped('step', since);
+      line = (await topFrame(session, threadId)).line;
+    }
+    assert.strictEqual(line, LINES.MAIN_SECOND, 'never reached the second macro');
+
+    // VS Code shows the new line, not the frame it had before the step
+    const end = Date.now() + 5_000;
+    let shown = -1;
+    while (Date.now() < end) {
+      shown = (vscode.window.activeTextEditor?.selection.active.line ?? -2) + 1;
+      if (shown === LINES.MAIN_SECOND) break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+    assert.strictEqual(shown, LINES.MAIN_SECOND, 'the editor stayed on the earlier line');
+  });
 });

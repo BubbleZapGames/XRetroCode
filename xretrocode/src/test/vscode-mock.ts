@@ -205,8 +205,10 @@ export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3
 
 export namespace commands {
     export const _registered: string[] = [];
-    export function registerCommand(id: string, _handler: any): any {
+    export const _handlers = new Map<string, (...args: any[]) => any>();
+    export function registerCommand(id: string, handler: any): any {
         _registered.push(id);
+        _handlers.set(id, handler);
         return { dispose: () => {} };
     }
 }
@@ -223,7 +225,9 @@ export namespace debug {
         _trackerFactories.push({ type, factory });
         return { dispose: () => {} };
     }
-    export function _reset() { _trackerFactories.length = 0; }
+    export let activeDebugSession: any = undefined;
+    export function _setActiveDebugSession(session: any) { activeDebugSession = session; }
+    export function _reset() { _trackerFactories.length = 0; activeDebugSession = undefined; }
 }
 
 export class DebugAdapterExecutable {

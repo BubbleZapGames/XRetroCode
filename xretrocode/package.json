@@ -146,6 +146,13 @@
         "command": "xretrocode.setupToolchain",
         "title": "Install R65 Toolchain",
         "category": "XRetroCode"
+      },
+      {
+        "command": "xretrocode.stepInstruction",
+        "title": "Step Instruction",
+        "category": "XRetroCode",
+        "icon": "$(debug-line-by-line)",
+        "enablement": "debugType == 'xretrocode' && debugState == 'stopped'"
       }
     ],
     "views": {
@@ -163,9 +170,20 @@
         "key": "f11",
         "command": "xretrocode.stepIntoMacro",
         "when": "debugType == 'xretrocode' && debugState == 'stopped' && xretrocode.stepIntoMacro"
+      },
+      {
+        "key": "alt+f11",
+        "command": "xretrocode.stepInstruction",
+        "when": "debugType == 'xretrocode' && debugState == 'stopped'"
       }
     ],
     "menus": {
+      "debug/toolBar": [
+        {
+          "command": "xretrocode.stepInstruction",
+          "when": "debugType == 'xretrocode'"
+        }
+      ],
       "editor/context": [
         {
           "command": "xretrocode.goToMacroDefinition",

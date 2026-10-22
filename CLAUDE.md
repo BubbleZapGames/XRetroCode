@@ -91,6 +91,8 @@ xretrocode/
                                 macros on the stopped line (the debugger steps over them)
     disassemblyView.ts        — Run and Debug's "Disassembly" webview: mesen-gdb's
                                 disassemble around the stopped (or selected) frame's PC
+    stepInstruction.ts        — "Step Instruction" (toolbar, Alt+F11): a stepIn with
+                                instruction granularity, as VS Code's Disassembly editor sends
     tasks.ts                  — r65c build/check task provider
     toolchainSetup.ts         — Offers to install r65c and WLA-DX (r65.dev's setup
                                 commands, in a terminal task) when an .r65 file opens
@@ -99,11 +101,11 @@ xretrocode/
     config.ts                 — Compiler settings (r65.*)
     e2e/                      — Real VS Code + mesen-gdb on Mesen-GDB's test ROMs
                                 (npm run test:e2e): green (R65, SNES) for breakpoints and
-                                conditions, stepping, pause and inspection, launch path,
-                                lifecycle, macro definitions, .sym labels, the disassembly
-                                view; hello_c (cc65 C, NES) for C breakpoints and stepping;
-                                hello_asm (ca65, NES) for assembly. e2e/fixtures/ is copied
-                                into its workspace
+                                conditions, stepping (and by instruction), pause and
+                                inspection, launch path, lifecycle, macro definitions, .sym
+                                labels, the disassembly view; hello_c (cc65 C, NES) for C
+                                breakpoints and stepping; hello_asm (ca65, NES) for
+                                assembly. e2e/fixtures/ is copied into its workspace
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```

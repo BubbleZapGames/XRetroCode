@@ -169,6 +169,18 @@ describe('package.json', () => {
         }
     });
 
+    it('should offer Step Instruction on the debug toolbar and Alt+F11 while stopped', () => {
+        const command = pkg.contributes.commands.find((c: any) => c.command === 'xretrocode.stepInstruction');
+        assert.ok(command, 'no xretrocode.stepInstruction command');
+        assert.strictEqual(command.enablement, "debugType == 'xretrocode' && debugState == 'stopped'");
+        assert.ok(command.icon);
+        const toolbar = pkg.contributes.menus['debug/toolBar'].find((m: any) => m.command === 'xretrocode.stepInstruction');
+        assert.strictEqual(toolbar?.when, "debugType == 'xretrocode'");
+        const key = pkg.contributes.keybindings.find((k: any) => k.command === 'xretrocode.stepInstruction');
+        assert.strictEqual(key?.key, 'alt+f11');
+        assert.strictEqual(key?.when, "debugType == 'xretrocode' && debugState == 'stopped'");
+    });
+
     it('should show a Disassembly view in Run and Debug during xretrocode sessions', () => {
         const view = pkg.contributes.views.debug.find((v: any) => v.id === 'xretrocode.disassembly');
         assert.ok(view, 'no xretrocode.disassembly view');

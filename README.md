@@ -29,6 +29,8 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
   matches with or without cc65's leading `_`.
 - Step over, in and out, pause and continue. Each emulated CPU appears as its
   own thread, except the SNES's SPC700 sound CPU for now.
+- **Step Instruction** (toolbar button or Alt+F11) runs one CPU instruction,
+  entering a `JSR`/`JSL`
 - Registers, flags and memory in the Variables view, plus expression evaluation
   in the Debug Console
 - A **Disassembly** view in Run and Debug: the instructions around the PC,

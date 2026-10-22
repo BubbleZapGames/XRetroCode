@@ -14,6 +14,7 @@ import { ConfigurationProvider } from './debugConfiguration';
 import { pickRom } from './romLocator';
 import { registerToolchainCheck } from './toolchainSetup';
 import { DisassemblyView } from './disassemblyView';
+import { InstructionStepper } from './stepInstruction';
 
 let taskProvider: vscode.Disposable | undefined;
 
@@ -79,6 +80,8 @@ function activateDebug(context: vscode.ExtensionContext) {
     );
     // Run and Debug's "Disassembly": the instructions around the PC
     context.subscriptions.push(new DisassemblyView());
+    // Step Instruction: one CPU instruction, from the toolbar or Alt+F11
+    context.subscriptions.push(new InstructionStepper());
 }
 
 export function deactivate() {
