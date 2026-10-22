@@ -179,6 +179,12 @@ export namespace window {
         return Promise.resolve(_openDialogResult);
     }
 
+    export const _webviewViewProviders: { id: string; provider: any }[] = [];
+    export function registerWebviewViewProvider(id: string, provider: any): any {
+        _webviewViewProviders.push({ id, provider });
+        return { dispose: () => {} };
+    }
+
     export function _setQuickPickResult(result: any) { _quickPickResult = result; }
     export function _setOpenDialogResult(result: any[] | undefined) { _openDialogResult = result; }
 
@@ -191,6 +197,7 @@ export namespace window {
         _openDialogResult = undefined;
         _quickPickCalls.length = 0;
         _openDialogCalls.length = 0;
+        _webviewViewProviders.length = 0;
     }
 }
 
@@ -211,6 +218,12 @@ export namespace debug {
     export function registerDebugConfigurationProvider(_type: string, _provider: any): any {
         return { dispose: () => {} };
     }
+    export const _trackerFactories: { type: string; factory: any }[] = [];
+    export function registerDebugAdapterTrackerFactory(type: string, factory: any): any {
+        _trackerFactories.push({ type, factory });
+        return { dispose: () => {} };
+    }
+    export function _reset() { _trackerFactories.length = 0; }
 }
 
 export class DebugAdapterExecutable {

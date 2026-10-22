@@ -23,7 +23,8 @@
     "workspaceContains:**/*.r65",
     "onDebugResolve:xretrocode",
     "onDebugInitialConfigurations",
-    "onCommand:xretrocode.setupToolchain"
+    "onCommand:xretrocode.setupToolchain",
+    "onView:xretrocode.disassembly"
   ],
   "main": "./out/main.js",
   "contributes": {
@@ -147,6 +148,16 @@
         "category": "XRetroCode"
       }
     ],
+    "views": {
+      "debug": [
+        {
+          "type": "webview",
+          "id": "xretrocode.disassembly",
+          "name": "Disassembly",
+          "when": "debugType == 'xretrocode'"
+        }
+      ]
+    },
     "keybindings": [
       {
         "key": "f11",

@@ -163,10 +163,18 @@ describe('package.json', () => {
 
     it('should only use activation events VS Code recognises', () => {
         // A malformed event (e.g. "debug: xretrocode") is silently ignored
-        const known = /^(onLanguage|workspaceContains|onDebugResolve|onCommand):\S+$|^onDebugInitialConfigurations$/;
+        const known = /^(onLanguage|workspaceContains|onDebugResolve|onCommand|onView):\S+$|^onDebugInitialConfigurations$/;
         for (const event of pkg.activationEvents) {
             assert.ok(known.test(event), `unrecognised activation event: ${event}`);
         }
+    });
+
+    it('should show a Disassembly view in Run and Debug during xretrocode sessions', () => {
+        const view = pkg.contributes.views.debug.find((v: any) => v.id === 'xretrocode.disassembly');
+        assert.ok(view, 'no xretrocode.disassembly view');
+        assert.strictEqual(view.type, 'webview');
+        assert.strictEqual(view.when, "debugType == 'xretrocode'");
+        assert.ok(pkg.activationEvents.includes('onView:xretrocode.disassembly'));
     });
 
     it('should only use menu ids VS Code recognises', () => {

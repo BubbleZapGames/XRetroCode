@@ -31,6 +31,9 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
   own thread, except the SNES's SPC700 sound CPU for now.
 - Registers, flags and memory in the Variables view, plus expression evaluation
   in the Debug Console
+- A **Disassembly** view in Run and Debug: the instructions around the PC,
+  from Mesen's disassembler, following each stop and the frame selected in
+  the Call Stack
 - Runs `make` before launching when the workspace has a makefile
 - Headless mode with no game window, for CI and remote sessions
 - **Go to Macro Definition** for macros on the stopped line. The debugger steps

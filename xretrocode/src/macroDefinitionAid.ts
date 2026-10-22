@@ -10,7 +10,7 @@ export const STEP_INTO_MACRO_COMMAND = 'xretrocode.stepIntoMacro';
 const STEP_INTO_CONTEXT_KEY = 'xretrocode.stepIntoMacro';
 
 /** Requests that set the program running again, after which the stop is stale. */
-const RESUMING_REQUESTS = new Set([
+export const RESUMING_REQUESTS = new Set([
   'continue', 'next', 'stepIn', 'stepOut', 'stepBack', 'reverseContinue', 'pause', 'restart', 'disconnect', 'terminate',
 ]);
 

@@ -13,6 +13,7 @@ import { DebugAdapterDescriptorFactory, setExtensionPath } from './debugAdapter'
 import { ConfigurationProvider } from './debugConfiguration';
 import { pickRom } from './romLocator';
 import { registerToolchainCheck } from './toolchainSetup';
+import { DisassemblyView } from './disassemblyView';
 
 let taskProvider: vscode.Disposable | undefined;
 
@@ -76,6 +77,8 @@ function activateDebug(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('xretrocode.pickRom', () => pickRom())
     );
+    // Run and Debug's "Disassembly": the instructions around the PC
+    context.subscriptions.push(new DisassemblyView());
 }
 
 export function deactivate() {
