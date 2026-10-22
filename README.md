@@ -28,7 +28,7 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
   Breakpoint**): a function, or any label in the symbol file. A C function
   matches with or without cc65's leading `_`.
 - Step over, in and out, pause and continue. Each emulated CPU appears as its
-  own thread.
+  own thread, except the SNES's SPC700 sound CPU for now.
 - Registers, flags and memory in the Variables view, plus expression evaluation
   in the Debug Console
 - Runs `make` before launching when the workspace has a makefile
