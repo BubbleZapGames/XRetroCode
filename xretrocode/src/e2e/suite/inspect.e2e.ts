@@ -17,6 +17,11 @@ describe('Pause and inspection', () => {
     const since = mark();
     await session.customRequest('pause', { threadId: 1 });
     const stopped = await waitForStopped('pause', since);
+    // The game idles on wait_nmi!()'s WAI: the editor should show that line,
+    // not main's caller
+    const top = await topFrame(session, stopped.body.threadId);
+    assert.ok(top.source?.path?.endsWith('green.r65'), JSON.stringify(top));
+    assert.strictEqual(top.line, LINES.MAIN_LOOP);
 
     const resumed = mark();
     await session.customRequest('continue', { threadId: stopped.body.threadId });
