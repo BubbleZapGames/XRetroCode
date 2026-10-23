@@ -65,6 +65,22 @@ describe('installPlan', () => {
     assert.strictEqual(plan.needsManualWla, true);
   });
 
+  it('downloads WLA-DX on Windows when it is missing', () => {
+    const plan = installPlan(NOTHING, { python: 'C:\\fake\\python.exe', hasPip: true }, 'win32');
+    assert.strictEqual(plan.downloadWla, true);
+    assert.strictEqual(plan.needsManualWla, false);
+    assert.deepStrictEqual(plan.steps.map(s => s.label), ['R65']);
+  });
+
+  it('downloads nothing when WLA-DX is already on PATH', () => {
+    for (const platform of ['win32', 'linux', 'darwin'] as NodeJS.Platform[]) {
+      const plan = installPlan({ r65: false, wla: true }, { python: 'python', hasPip: true }, platform);
+      assert.strictEqual(plan.downloadWla, false, platform);
+      assert.strictEqual(plan.needsManualWla, false, platform);
+      assert.deepStrictEqual(plan.steps.map(s => s.label), ['R65'], platform);
+    }
+  });
+
   it('leaves out --user in a virtualenv', () => {
     const plan = installPlan({ r65: false, wla: true }, { python: '/venv/bin/python', hasPip: true, inVirtualEnv: true });
     assert.deepStrictEqual(plan.steps[0].args, ['-m', 'pip', 'install', R65_PIP_SOURCE]);
@@ -131,6 +147,15 @@ if (process.platform !== 'win32') {
       assert.deepStrictEqual(checkToolchain(), { r65: true, wla: false });
       fs.writeFileSync(path.join(dir, 'wlalink'), '');
       assert.deepStrictEqual(checkToolchain(), { r65: true, wla: true });
+    });
+
+    it('counts WLA-DX on PATH as installed, so it never asks to install or download it', async () => {
+      const dir = fakePath(['wla-65816', 'wlalink']);
+      fakePython(dir, { r65: true, pip: true });
+      assert.deepStrictEqual(checkToolchain(), { r65: true, wla: true });
+      window._reset();
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(window._warnings.length, 0);
     });
 
     it('finds R65 by running python -m r65.compiler.main, not by an r65c on PATH', () => {

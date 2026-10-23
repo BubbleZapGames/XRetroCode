@@ -99,6 +99,11 @@ xretrocode/
                                 without them. R65 counts as installed when `python -m
                                 r65.compiler.main` runs, as the makefiles call it
     findOnPath.ts             — PATH search shared with the mesen-gdb locator
+    wlaTools.ts               — Where WLA-DX lives without PATH edits: on Windows downloads
+                                the official v10.7 build (SHA-256 pinned) into extension
+                                storage; elsewhere uses Homebrew's folder. Puts it on new
+                                terminals' PATH (environmentVariableCollection) and on the
+                                ROM build's (buildEnv)
     makeInstall.ts            — Windows: before a build, offers "winget install ezwinports.make"
                                 when there's no make, and finds winget's make.exe while
                                 VS Code's PATH predates the install

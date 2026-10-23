@@ -183,6 +183,10 @@ export namespace window {
         return Promise.resolve(_openDialogResult);
     }
 
+    export function withProgress(_options: any, task: (progress: any, token: any) => Promise<any>): Promise<any> {
+        return task({ report() {} }, { isCancellationRequested: false });
+    }
+
     export const _webviewViewProviders: { id: string; provider: any }[] = [];
     export function registerWebviewViewProvider(id: string, provider: any): any {
         _webviewViewProviders.push({ id, provider });
@@ -387,6 +391,7 @@ export class Task {
 }
 
 export const TaskScope = { Workspace: 1, Global: 2 };
+export const ProgressLocation = { SourceControl: 1, Window: 10, Notification: 15 };
 export const TaskGroup = { Build: { _id: 'build' }, Test: { _id: 'test' } };
 export type ExtensionContext = { subscriptions: any[] };
 export type TaskDefinition = { type: string; [key: string]: any };

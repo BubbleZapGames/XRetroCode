@@ -115,9 +115,16 @@ offers to install it, running the
 [setup guide](https://r65.dev/docs/getting-started/setup)'s commands in a
 terminal:
 
-- WLA-DX: `brew install wla-dx`. Without Homebrew it links to the
-  [WLA-DX releases](https://github.com/vhelin/wla-dx/releases) instead; put
-  `wla-65816` and `wlalink` on your `PATH`.
+- WLA-DX, when `wla-65816` and `wlalink` aren't already on your `PATH`:
+  - Windows: downloads the official
+    [WLA-DX v10.7](https://github.com/vhelin/wla-dx/releases/tag/v10.7) build
+    (checked against its SHA-256) into the extension's own storage. Nothing to
+    put on `PATH` and no restart: the extension adds the folder to the `PATH`
+    of its builds and of new terminals.
+  - macOS/Linux: `brew install wla-dx`. If Homebrew's folder isn't on VS
+    Code's `PATH`, the extension adds it the same way. Without Homebrew it
+    links to the [WLA-DX releases](https://github.com/vhelin/wla-dx/releases);
+    put `wla-65816` and `wlalink` on your `PATH`.
 - R65: `python -m pip install --user git+https://github.com/BubbleZapGames/R65.git@release`,
   into the same `python` the makefiles run (without `--user` in a virtualenv).
   When there's no `python` on `PATH`, or it has no pip, it links to

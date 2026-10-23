@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import { findOnPath } from './findOnPath';
+import { WLA_TOOLS, applyToolPath, brewDirs, downloadWla, findInDirs, wlaDirs } from './wlaTools';
+
+export { WLA_TOOLS, setExtraDirs } from './wlaTools';
 
 /** What r65.dev's setup guide has pip install. */
 export const R65_PIP_SOURCE = 'git+https://github.com/BubbleZapGames/R65.git@release';
 export const SETUP_DOCS_URL = 'https://r65.dev/docs/getting-started/setup';
 /** Its installers include pip, which R65's install needs. */
 export const PYTHON_DOWNLOAD_URL = 'https://www.python.org/downloads/';
-/** Prebuilt WLA-DX, for machines without Homebrew. */
+/** WLA-DX's releases, for macOS and Linux without Homebrew (they have only Windows builds). */
 export const WLA_RELEASES_URL = 'https://github.com/vhelin/wla-dx/releases';
-export const WLA_TOOLS = ['wla-65816', 'wlalink'];
 /**
  * How R65 makefiles run the compiler: `python -m r65.compiler.main`. R65 is
  * installed when that runs, whether or not an r65c script is on PATH.
@@ -28,49 +28,17 @@ export interface ToolchainStatus {
     wla: boolean;
 }
 
-/**
- * Where Homebrew puts tools, on Apple silicon, Intel and Linux, which may not
- * be on VS Code's PATH.
- */
-function defaultExtraDirs(): string[] {
-    return [
-        '/opt/homebrew/bin',
-        '/usr/local/bin',
-        '/home/linuxbrew/.linuxbrew/bin',
-    ];
-}
-
-let extraDirsOverride: string[] | undefined;
-
-/** Search these folders instead of the installers' usual ones (tests); undefined restores them. */
-export function setExtraDirs(dirs: string[] | undefined): void {
-    extraDirsOverride = dirs;
-}
-
-function extraDirs(): string[] {
-    return extraDirsOverride ?? defaultExtraDirs();
-}
-
-/** `name` on PATH, else in an installer's usual folder. */
+/** `name` on PATH, else in Homebrew's folder, which VS Code's PATH may lack. */
 function findTool(name: string): string | undefined {
-    return findOnPath(name) ?? findInDirs(name, extraDirs());
-}
-
-function findInDirs(name: string, dirs: string[]): string | undefined {
-    for(const dir of dirs) {
-        const candidate = path.join(dir, name);
-        if(fs.existsSync(candidate)) {
-            return candidate;
-        }
-    }
-    return undefined;
+    return findOnPath(name) ?? findInDirs(name, brewDirs());
 }
 
 /** Whether R65 (`python -m r65.compiler.main`) and WLA-DX can be run. */
 export function checkToolchain(): ToolchainStatus {
     const python = findPython();
     const r65 = !!python && runsOk(python, ['-m', R65_MODULE, '--help']);
-    const wla = WLA_TOOLS.every(tool => !!findOnPath(tool));
+    // On PATH, or where XRetroCode puts it on PATH itself (wlaTools)
+    const wla = WLA_TOOLS.every(tool => !!findOnPath(tool)) || wlaDirs().length > 0;
     return { r65, wla };
 }
 
@@ -97,7 +65,9 @@ export interface InstallStep {
 
 export interface InstallPlan {
     steps: InstallStep[];
-    /** No Homebrew: WLA-DX has to be downloaded by hand */
+    /** Windows: download the official WLA-DX build into extension storage */
+    downloadWla: boolean;
+    /** macOS/Linux without Homebrew: WLA-DX has to be installed by hand */
     needsManualWla: boolean;
     /** No `python` with pip */
     needsPython: boolean;
@@ -130,14 +100,21 @@ export function findInstallers(platform: NodeJS.Platform = process.platform): In
 }
 
 /** The setup guide's commands, for what's missing and what this machine has. */
-export function installPlan(status: ToolchainStatus, installers: Installers): InstallPlan {
+export function installPlan(
+    status: ToolchainStatus,
+    installers: Installers,
+    platform: NodeJS.Platform = process.platform
+): InstallPlan {
     const steps: InstallStep[] = [];
+    let downloadWla = false;
     let needsManualWla = false;
     let needsPython = false;
 
     if(!status.wla) {
         if(installers.brew) {
             steps.push({ label: 'WLA-DX', command: installers.brew, args: ['install', 'wla-dx'] });
+        } else if(platform === 'win32') {
+            downloadWla = true;
         } else {
             needsManualWla = true;
         }
@@ -158,7 +135,7 @@ export function installPlan(status: ToolchainStatus, installers: Installers): In
         }
     }
 
-    return { steps, needsManualWla, needsPython };
+    return { steps, downloadWla, needsManualWla, needsPython };
 }
 
 function describeMissing(status: ToolchainStatus): string {
@@ -195,6 +172,19 @@ export async function installToolchain(status: ToolchainStatus = checkToolchain(
     // One failure doesn't stop the rest: WLA-DX and R65 install separately
     const failed: string[] = [];
     const succeeded = new Set<string>();
+    if(plan.downloadWla) {
+        try {
+            await downloadWla();
+            succeeded.add('WLA-DX');
+        } catch(e) {
+            const GUIDE = 'Setup Guide';
+            const choice = await vscode.window.showErrorMessage(
+                `Downloading WLA-DX failed: ${e instanceof Error ? e.message : e}.`,
+                GUIDE
+            );
+            if(choice === GUIDE) await vscode.env.openExternal(vscode.Uri.parse(SETUP_DOCS_URL));
+        }
+    }
     for(const step of plan.steps) {
         const exitCode = await runStep(step);
         if(exitCode === 0) {
@@ -239,6 +229,8 @@ export async function installToolchain(status: ToolchainStatus = checkToolchain(
         return;
     }
 
+    // A brew install may have landed in a folder VS Code's PATH lacks
+    applyToolPath();
     const after = checkToolchain();
     if(failed.length === 0 && after.r65 && after.wla) {
         void vscode.window.showInformationMessage('The R65 toolchain is installed.');
@@ -251,7 +243,7 @@ export async function installToolchain(status: ToolchainStatus = checkToolchain(
     }
     // Installed, but VS Code's PATH doesn't reach it
     const offPath = (succeeded.has('WLA-DX') && !after.wla ? WLA_TOOLS : [])
-        .map(name => findInDirs(name, extraDirs()) ?? name);
+        .map(name => findInDirs(name, brewDirs()) ?? name);
     if(offPath.length > 0) {
         void vscode.window.showWarningMessage(
             `Installed, but ${offPath.join(', ')} isn't on VS Code's PATH. Add its folder to your PATH, then restart VS Code.`

@@ -15,11 +15,14 @@ import { pickRom } from './romLocator';
 import { registerToolchainCheck } from './toolchainSetup';
 import { DisassemblyView } from './disassemblyView';
 import { InstructionStepper } from './stepInstruction';
+import { initWlaTools } from './wlaTools';
 
 let taskProvider: vscode.Disposable | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
     setExtensionPath(context.extensionPath);
+    // WLA-DX's folder on PATH for builds and terminals, before anything checks for it
+    initWlaTools(context);
     activateLanguage(context);
     activateDebug(context);
 }
