@@ -96,8 +96,8 @@ Package it as a `.vsix` and install that:
 ```bash
 cd xretrocode
 npm install
-npm run package                                # → xretrocode-0.3.0.vsix
-code --install-extension xretrocode-0.3.0.vsix
+npm run package                                # → xretrocode-0.4.0.vsix
+code --install-extension xretrocode-0.4.0.vsix
 ```
 
 You can also install it from the Extensions view: open the `...` menu and
