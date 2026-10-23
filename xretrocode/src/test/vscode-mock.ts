@@ -81,6 +81,9 @@ export namespace tasks {
     let _exitCode: number | undefined = 0;
 
     export const _executed: any[] = [];
+    // Runs as a task starts, standing in for what the command would do
+    let _onExecute: ((task: any) => void) | undefined;
+    export function _setOnExecute(hook: ((task: any) => void) | undefined) { _onExecute = hook; }
 
     export function registerTaskProvider(type: string, provider: any): any {
         return { dispose: () => {} };
@@ -89,6 +92,7 @@ export namespace tasks {
     export function executeTask(task: any): Promise<any> {
         const execution = { task };
         _executed.push(task);
+        _onExecute?.(task);
         // The real API reports completion later; a macrotask keeps the caller's
         // onDidEndTaskProcess subscription ahead of the event.
         setTimeout(() => {
@@ -105,7 +109,7 @@ export namespace tasks {
     }
 
     export function _setExitCode(code: number | undefined) { _exitCode = code; }
-    export function _reset() { _endHandlers = []; _executed.length = 0; _exitCode = 0; }
+    export function _reset() { _endHandlers = []; _executed.length = 0; _exitCode = 0; _onExecute = undefined; }
 }
 
 export namespace languages {

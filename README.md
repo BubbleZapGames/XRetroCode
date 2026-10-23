@@ -127,8 +127,9 @@ Toolchain** in the Command Palette runs the install any time.
 
 ### 3. Debug a ROM
 
-Open your game's folder and press F5. To pin the ROM or other options, add a
-launch configuration:
+Open your game's folder and press F5. On Windows, if `make` isn't installed,
+the first launch offers to install it with `winget install ezwinports.make`.
+To pin the ROM or other options, add a launch configuration:
 
 ```json
 {

@@ -3,6 +3,7 @@ import { pickRom } from './romLocator';
 import { locateMesenGdb, promptForMesenGdb } from './debugAdapter';
 import { hasMakefile } from './makefile';
 import { buildRom } from './romTask';
+import { ensureMake } from './makeInstall';
 
 export class ConfigurationProvider implements vscode.DebugConfigurationProvider {
     provideDebugConfigurations(folder: vscode.WorkspaceFolder | undefined, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration[]> {
@@ -31,6 +32,10 @@ export class ConfigurationProvider implements vscode.DebugConfigurationProvider 
             .getConfiguration('xretrocode')
             .get<boolean>('buildBeforeLaunch', true);
         if(buildBeforeLaunch && folder && await hasMakefile(folder)) {
+            // Windows has no make of its own: offer to install it first
+            if(!(await ensureMake())) {
+                return undefined;
+            }
             const exitCode = await buildRom(folder);
             if(exitCode !== 0 && exitCode !== undefined) {
                 const DEBUG_ANYWAY = 'Debug Anyway';

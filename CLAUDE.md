@@ -98,6 +98,9 @@ xretrocode/
                                 commands, in a terminal task) when an .r65 file opens
                                 without them
     findOnPath.ts             — PATH search shared with the mesen-gdb locator
+    makeInstall.ts            — Windows: before a build, offers "winget install ezwinports.make"
+                                when there's no make, and finds winget's make.exe while
+                                VS Code's PATH predates the install
     config.ts                 — Compiler settings (r65.*)
     e2e/                      — Real VS Code + mesen-gdb on Mesen-GDB's test ROMs
                                 (npm run test:e2e): green (R65, SNES) for breakpoints and

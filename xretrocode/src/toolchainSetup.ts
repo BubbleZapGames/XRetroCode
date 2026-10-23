@@ -166,7 +166,7 @@ function describeMissing(status: ToolchainStatus): string {
 }
 
 /** Run one step in a terminal and wait for it; undefined if it couldn't start. */
-async function runStep(step: InstallStep): Promise<number | undefined> {
+export async function runStep(step: InstallStep): Promise<number | undefined> {
     const task = new vscode.Task(
         { type: 'xretrocode', command: 'setupToolchain' },
         vscode.workspace.workspaceFolders?.length ? vscode.TaskScope.Workspace : vscode.TaskScope.Global,

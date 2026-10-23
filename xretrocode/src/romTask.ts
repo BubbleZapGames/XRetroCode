@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { hasMakefile } from './makefile';
+import { makeCommand } from './makeInstall';
 
 export const TASK_TYPE = 'xretrocode';
 export const ROM_TASK_NAME = 'rom';
@@ -19,7 +20,7 @@ export function createRomTask(
 ): vscode.Task {
     const taskDef: vscode.TaskDefinition = definition ?? { type: TASK_TYPE, command: ROM_TASK_NAME };
     const args: string[] = definition?.args ?? [];
-    const execution = new vscode.ShellExecution('make', args, { cwd: folder.uri.fsPath });
+    const execution = new vscode.ShellExecution(makeCommand(), args, { cwd: folder.uri.fsPath });
     const task = new vscode.Task(
         taskDef,
         folder,
