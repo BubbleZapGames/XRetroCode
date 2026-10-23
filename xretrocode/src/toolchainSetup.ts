@@ -27,13 +27,24 @@ export interface ToolchainStatus {
  * Where installers put tools that may not be on VS Code's PATH: pipx and
  * pip --user (~/.local/bin), and Homebrew on Apple silicon, Intel and Linux.
  */
-function extraDirs(): string[] {
+function defaultExtraDirs(): string[] {
     return [
         path.join(os.homedir(), '.local', 'bin'),
         '/opt/homebrew/bin',
         '/usr/local/bin',
         '/home/linuxbrew/.linuxbrew/bin',
     ];
+}
+
+let extraDirsOverride: string[] | undefined;
+
+/** Search these folders instead of the installers' usual ones (tests); undefined restores them. */
+export function setExtraDirs(dirs: string[] | undefined): void {
+    extraDirsOverride = dirs;
+}
+
+function extraDirs(): string[] {
+    return extraDirsOverride ?? defaultExtraDirs();
 }
 
 /** `name` on PATH, else in an installer's usual folder. */

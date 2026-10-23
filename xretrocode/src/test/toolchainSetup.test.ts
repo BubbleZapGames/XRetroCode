@@ -5,7 +5,7 @@ import * as path from 'path';
 import { workspace, window, tasks, env } from './vscode-mock';
 import { findOnPath } from '../findOnPath';
 import {
-  checkToolchain, installPlan, isWindowsStoreStub, promptIfMissing, registerToolchainCheck,
+  checkToolchain, installPlan, isWindowsStoreStub, promptIfMissing, registerToolchainCheck, setExtraDirs,
   DISMISSED_KEY, PYTHON_DOWNLOAD_URL, R65_PIP_SOURCE, SETUP_DOCS_URL,
 } from '../toolchainSetup';
 
@@ -140,8 +140,13 @@ describe('toolchain prompt', () => {
     tasks._reset();
     env._reset();
     fakePath([]);
+    // Only the fake PATH: a pipx or brew on this machine must not count
+    setExtraDirs([]);
   });
-  afterEach(() => { process.env.PATH = savedPath; });
+  afterEach(() => {
+    process.env.PATH = savedPath;
+    setExtraDirs(undefined);
+  });
 
   it('names what is missing', async () => {
     await promptIfMissing(makeContext() as any);
