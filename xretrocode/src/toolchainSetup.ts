@@ -44,8 +44,7 @@ export function checkToolchain(): ToolchainStatus {
 
 /** The `python` R65 makefiles run, skipping Windows' Microsoft Store placeholder. */
 function findPython(): string | undefined {
-    const python = findOnPath(PYTHON);
-    return python && !isWindowsStoreStub(python) ? python : undefined;
+    return findOnPath(PYTHON, process.env, process.platform, isWindowsStoreStub);
 }
 
 function runsOk(command: string, args: string[]): boolean {

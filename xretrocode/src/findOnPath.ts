@@ -3,12 +3,14 @@ import * as fs from 'fs';
 
 /**
  * The first `name` in a PATH directory, or undefined. On Windows, also tries
- * each PATHEXT extension (mesen-gdb → mesen-gdb.exe).
+ * each PATHEXT extension (mesen-gdb → mesen-gdb.exe). Candidates `skip`
+ * accepts are passed over, and the search goes on.
  */
 export function findOnPath(
     name: string,
     env: NodeJS.ProcessEnv = process.env,
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
+    skip?: (candidate: string) => boolean
 ): string | undefined {
     const windows = platform === 'win32';
     // Windows spells it Path, and env lookups there ignore case
@@ -21,7 +23,7 @@ export function findOnPath(
         if(!dir) continue;
         for(const ext of exts) {
             const candidate = path.join(dir, name + ext);
-            if(isFile(candidate)) {
+            if(isFile(candidate) && !skip?.(candidate)) {
                 return candidate;
             }
         }
@@ -32,7 +34,17 @@ export function findOnPath(
 function isFile(p: string): boolean {
     try {
         return fs.statSync(p).isFile();
-    } catch {
-        return false;
+    } catch(e) {
+        const code = (e as NodeJS.ErrnoException).code;
+        if(code === 'ENOENT' || code === 'ENOTDIR') {
+            return false;
+        }
+        // Windows App Execution Aliases (e.g. WindowsApps\winget.exe) can't be
+        // stat'd, but lstat sees them as links, and they run fine
+        try {
+            return fs.lstatSync(p).isSymbolicLink();
+        } catch {
+            return false;
+        }
     }
 }
