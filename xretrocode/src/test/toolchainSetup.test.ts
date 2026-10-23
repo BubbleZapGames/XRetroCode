@@ -91,7 +91,7 @@ describe('installPlan', () => {
 
   it('passes over the Microsoft Store python placeholder', () => {
     assert.ok(isWindowsStoreStub('C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe'));
-    assert.ok(!isWindowsStoreStub('C:\\Python312\\python.exe'));
+    assert.ok(!isWindowsStoreStub('C:\\fake\\python.exe'));
   });
 });
 
@@ -240,7 +240,11 @@ if (process.platform !== 'win32') {
       window._setErrorMessageChoice('Install Python');
       await promptIfMissing(makeContext() as any);
       assert.strictEqual(tasks._executed.length, 0);
-      assert.ok(window._messages.some(m => m.includes('needs Python 3.10+ with pip')));
+      const message = window._messages.find(m => m.includes('needs Python 3.10+ with pip'));
+      assert.ok(message, JSON.stringify(window._messages));
+      // Names the command the makefiles run, not the button's label
+      assert.ok(message.includes(`as "python" on your PATH`), message);
+      assert.ok(message.includes(`"python -m ${R65_MODULE}"`), message);
       assert.deepStrictEqual(env._opened.map(u => u.path), [PYTHON_DOWNLOAD_URL]);
     });
 

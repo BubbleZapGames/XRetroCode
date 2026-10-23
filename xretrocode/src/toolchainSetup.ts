@@ -205,16 +205,16 @@ export async function installToolchain(status: ToolchainStatus = checkToolchain(
     }
 
     if(plan.needsPython) {
-        const PYTHON = 'Install Python';
+        const INSTALL_PYTHON = 'Install Python';
         const GUIDE = 'Setup Guide';
         const choice = await vscode.window.showErrorMessage(
             `Installing R65 needs Python 3.10+ with pip, as "${PYTHON}" on your PATH (R65 makefiles run ` +
             `"${PYTHON} -m ${R65_MODULE}"; on Windows, tick "Add python.exe to PATH" in its installer). ` +
             'Install Python, restart VS Code, then run "XRetroCode: Install R65 Toolchain" again.',
-            PYTHON,
+            INSTALL_PYTHON,
             GUIDE
         );
-        if(choice === PYTHON) await vscode.env.openExternal(vscode.Uri.parse(PYTHON_DOWNLOAD_URL));
+        if(choice === INSTALL_PYTHON) await vscode.env.openExternal(vscode.Uri.parse(PYTHON_DOWNLOAD_URL));
         if(choice === GUIDE) await vscode.env.openExternal(vscode.Uri.parse(SETUP_DOCS_URL));
     }
 
