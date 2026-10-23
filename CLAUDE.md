@@ -94,9 +94,10 @@ xretrocode/
     stepInstruction.ts        — "Step Instruction" (toolbar, Alt+F11): a stepIn with
                                 instruction granularity, as VS Code's Disassembly editor sends
     tasks.ts                  — r65c build/check task provider
-    toolchainSetup.ts         — Offers to install r65c and WLA-DX (r65.dev's setup
+    toolchainSetup.ts         — Offers to install R65 and WLA-DX (r65.dev's setup
                                 commands, in a terminal task) when an .r65 file opens
-                                without them
+                                without them. R65 counts as installed when `python -m
+                                r65.compiler.main` runs, as the makefiles call it
     findOnPath.ts             — PATH search shared with the mesen-gdb locator
     makeInstall.ts            — Windows: before a build, offers "winget install ezwinports.make"
                                 when there's no make, and finds winget's make.exe while

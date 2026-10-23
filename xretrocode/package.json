@@ -322,7 +322,7 @@
         "xretrocode.checkToolchain": {
           "type": "boolean",
           "default": true,
-          "description": "When an R65 file is opened, offer to install the r65c compiler and WLA-DX if they're missing."
+          "description": "When an R65 file is opened, offer to install the R65 compiler (python -m r65.compiler.main) and WLA-DX if they're missing."
         },
         "xretrocode.buildBeforeLaunch": {
           "type": "boolean",

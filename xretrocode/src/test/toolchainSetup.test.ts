@@ -6,10 +6,11 @@ import { workspace, window, tasks, env } from './vscode-mock';
 import { findOnPath } from '../findOnPath';
 import {
   checkToolchain, installPlan, isWindowsStoreStub, promptIfMissing, registerToolchainCheck, setExtraDirs,
-  DISMISSED_KEY, PYTHON_DOWNLOAD_URL, R65_PIP_SOURCE, SETUP_DOCS_URL,
+  DISMISSED_KEY, PYTHON_DOWNLOAD_URL, R65_MODULE, R65_PIP_SOURCE, SETUP_DOCS_URL,
 } from '../toolchainSetup';
 
-const NOTHING = { r65c: false, wla: false };
+const NOTHING = { r65: false, wla: false };
+const PIP_INSTALL = ['-m', 'pip', 'install', '--user', R65_PIP_SOURCE];
 
 function makeContext(state: Record<string, any> = {}) {
   return {
@@ -32,51 +33,58 @@ function fakePath(names: string[]): string {
   return dir;
 }
 
+/**
+ * A `python` in `dir` for which `-m r65.compiler.main` and `-m pip` succeed
+ * or fail as asked (a shell script, so not on Windows).
+ */
+function fakePython(dir: string, { r65, pip }: { r65: boolean; pip: boolean }): string {
+  const python = path.join(dir, 'python');
+  fs.writeFileSync(python, [
+    '#!/bin/sh',
+    `[ "$1 $2" = "-m ${R65_MODULE}" ] && exit ${r65 ? 0 : 1}`,
+    `[ "$1 $2" = "-m pip" ] && exit ${pip ? 0 : 1}`,
+    'exit 1',
+  ].join('\n') + '\n', { mode: 0o755 });
+  return python;
+}
+
 describe('installPlan', () => {
-  it('runs the setup guide commands with brew and pipx', () => {
-    const plan = installPlan(NOTHING, { brew: '/opt/homebrew/bin/brew', pipx: '/usr/bin/pipx' });
+  it('runs the setup guide commands: brew, and pip into the makefiles\' python', () => {
+    const plan = installPlan(NOTHING, { brew: '/opt/homebrew/bin/brew', python: '/usr/bin/python', hasPip: true });
     assert.deepStrictEqual(plan.steps.map(s => [s.command, ...s.args]), [
       ['/opt/homebrew/bin/brew', 'install', 'wla-dx'],
-      ['/usr/bin/pipx', 'install', 'git+https://github.com/BubbleZapGames/R65.git@release'],
+      ['/usr/bin/python', ...PIP_INSTALL],
     ]);
     assert.strictEqual(plan.needsManualWla, false);
     assert.strictEqual(plan.needsPython, false);
   });
 
-  it('falls back to pip --user, and a WLA-DX download, without pipx or brew', () => {
-    const plan = installPlan(NOTHING, { python: '/usr/bin/python3', hasPip: true });
-    assert.deepStrictEqual(plan.steps.map(s => [s.command, ...s.args]), [
-      ['/usr/bin/python3', '-m', 'pip', 'install', '--user', R65_PIP_SOURCE],
-    ]);
+  it('links a WLA-DX download without brew', () => {
+    const plan = installPlan(NOTHING, { python: '/usr/bin/python', hasPip: true });
+    assert.deepStrictEqual(plan.steps.map(s => s.label), ['R65']);
     assert.strictEqual(plan.needsManualWla, true);
   });
 
-  it('uses the py launcher on Windows', () => {
-    const plan = installPlan({ r65c: false, wla: true }, { python: 'C:\\Windows\\py.exe', hasPip: true });
-    assert.deepStrictEqual(plan.steps[0].args, ['-m', 'pip', 'install', '--user', R65_PIP_SOURCE]);
-    assert.strictEqual(plan.steps[0].command, 'C:\\Windows\\py.exe');
-  });
-
   it('leaves out --user in a virtualenv', () => {
-    const plan = installPlan({ r65c: false, wla: true }, { python: '/venv/bin/python3', hasPip: true, inVirtualEnv: true });
+    const plan = installPlan({ r65: false, wla: true }, { python: '/venv/bin/python', hasPip: true, inVirtualEnv: true });
     assert.deepStrictEqual(plan.steps[0].args, ['-m', 'pip', 'install', R65_PIP_SOURCE]);
   });
 
   it('installs only what is missing', () => {
-    const installers = { brew: 'brew', pipx: 'pipx' };
-    assert.deepStrictEqual(installPlan({ r65c: true, wla: false }, installers).steps.map(s => s.label), ['WLA-DX']);
-    assert.deepStrictEqual(installPlan({ r65c: false, wla: true }, installers).steps.map(s => s.label), ['R65']);
-    assert.deepStrictEqual(installPlan({ r65c: true, wla: true }, installers).steps, []);
+    const installers = { brew: 'brew', python: 'python', hasPip: true };
+    assert.deepStrictEqual(installPlan({ r65: true, wla: false }, installers).steps.map(s => s.label), ['WLA-DX']);
+    assert.deepStrictEqual(installPlan({ r65: false, wla: true }, installers).steps.map(s => s.label), ['R65']);
+    assert.deepStrictEqual(installPlan({ r65: true, wla: true }, installers).steps, []);
   });
 
-  it('asks for Python when there is nothing to run pip with', () => {
-    const plan = installPlan({ r65c: false, wla: true }, {});
+  it('asks for Python when there is no python', () => {
+    const plan = installPlan({ r65: false, wla: true }, {});
     assert.deepStrictEqual(plan.steps, []);
     assert.strictEqual(plan.needsPython, true);
   });
 
   it('asks for Python when its python has no pip', () => {
-    const plan = installPlan({ r65c: false, wla: true }, { python: '/usr/bin/python3', hasPip: false });
+    const plan = installPlan({ r65: false, wla: true }, { python: '/usr/bin/python', hasPip: false });
     assert.deepStrictEqual(plan.steps, []);
     assert.strictEqual(plan.needsPython, true);
   });
@@ -92,9 +100,9 @@ describe('findOnPath', () => {
   afterEach(() => { process.env.PATH = savedPath; });
 
   it('finds a file in a PATH directory', () => {
-    const dir = fakePath(['r65c']);
-    assert.strictEqual(findOnPath('r65c'), path.join(dir, 'r65c'));
-    assert.strictEqual(findOnPath('wlalink'), undefined);
+    const dir = fakePath(['wlalink']);
+    assert.strictEqual(findOnPath('wlalink'), path.join(dir, 'wlalink'));
+    assert.strictEqual(findOnPath('wla-65816'), undefined);
   });
 
   it('tries PATHEXT extensions on Windows', () => {
@@ -105,119 +113,129 @@ describe('findOnPath', () => {
 
   it('ignores a directory with the name', () => {
     const dir = fakePath([]);
-    fs.mkdirSync(path.join(dir, 'r65c'));
-    assert.strictEqual(findOnPath('r65c'), undefined);
+    fs.mkdirSync(path.join(dir, 'wlalink'));
+    assert.strictEqual(findOnPath('wlalink'), undefined);
   });
 });
 
-describe('checkToolchain', () => {
-  const savedPath = process.env.PATH;
-  beforeEach(() => workspace._reset());
-  afterEach(() => { process.env.PATH = savedPath; });
+// The rest runs fake `python` shell scripts
+if (process.platform !== 'win32') {
+  describe('checkToolchain', () => {
+    const savedPath = process.env.PATH;
+    beforeEach(() => workspace._reset());
+    afterEach(() => { process.env.PATH = savedPath; });
 
-  it('needs both WLA-DX tools', () => {
-    fakePath(['r65c', 'wla-65816']);
-    assert.deepStrictEqual(checkToolchain(), { r65c: true, wla: false });
-    fs.writeFileSync(path.join(process.env.PATH!, 'wlalink'), '');
-    assert.deepStrictEqual(checkToolchain(), { r65c: true, wla: true });
+    it('needs both WLA-DX tools', () => {
+      const dir = fakePath(['wla-65816']);
+      fakePython(dir, { r65: true, pip: true });
+      assert.deepStrictEqual(checkToolchain(), { r65: true, wla: false });
+      fs.writeFileSync(path.join(dir, 'wlalink'), '');
+      assert.deepStrictEqual(checkToolchain(), { r65: true, wla: true });
+    });
+
+    it('finds R65 by running python -m r65.compiler.main, not by an r65c on PATH', () => {
+      const dir = fakePath(['r65c', 'wla-65816', 'wlalink']);
+      assert.strictEqual(checkToolchain().r65, false, 'no python');
+      fakePython(dir, { r65: false, pip: true });
+      assert.strictEqual(checkToolchain().r65, false, 'python without R65');
+      fakePython(dir, { r65: true, pip: true });
+      assert.strictEqual(checkToolchain().r65, true);
+    });
   });
 
-  it('takes r65.compilerPath as an absolute path', () => {
-    const dir = fakePath([]);
-    const compiler = path.join(dir, 'my-r65c');
-    workspace._setConfig('r65.compilerPath', compiler);
-    assert.strictEqual(checkToolchain().r65c, false);
-    fs.writeFileSync(compiler, '');
-    assert.strictEqual(checkToolchain().r65c, true);
-  });
-});
+  describe('toolchain prompt', () => {
+    const savedPath = process.env.PATH;
+    const savedVenv = process.env.VIRTUAL_ENV;
+    beforeEach(() => {
+      workspace._reset();
+      window._reset();
+      tasks._reset();
+      env._reset();
+      fakePath([]);
+      // Only the fake PATH: a brew on this machine must not count
+      setExtraDirs([]);
+      delete process.env.VIRTUAL_ENV;
+    });
+    afterEach(() => {
+      process.env.PATH = savedPath;
+      setExtraDirs(undefined);
+      if (savedVenv !== undefined) process.env.VIRTUAL_ENV = savedVenv;
+    });
 
-describe('toolchain prompt', () => {
-  const savedPath = process.env.PATH;
-  beforeEach(() => {
-    workspace._reset();
-    window._reset();
-    tasks._reset();
-    env._reset();
-    fakePath([]);
-    // Only the fake PATH: a pipx or brew on this machine must not count
-    setExtraDirs([]);
-  });
-  afterEach(() => {
-    process.env.PATH = savedPath;
-    setExtraDirs(undefined);
-  });
+    it('names what is missing', async () => {
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(window._warnings.length, 1);
+      assert.ok(window._warnings[0].msg.includes(`python -m ${R65_MODULE}`), window._warnings[0].msg);
+      assert.ok(window._warnings[0].msg.includes('WLA-DX'));
+      assert.deepStrictEqual(window._warnings[0].items, ['Install', 'Setup Guide', "Don't Ask Again"]);
+    });
 
-  it('names what is missing', async () => {
-    await promptIfMissing(makeContext() as any);
-    assert.strictEqual(window._warnings.length, 1);
-    assert.ok(window._warnings[0].msg.includes('r65c'));
-    assert.ok(window._warnings[0].msg.includes('WLA-DX'));
-    assert.deepStrictEqual(window._warnings[0].items, ['Install', 'Setup Guide', "Don't Ask Again"]);
-  });
+    it('stays quiet when everything is installed', async () => {
+      fakePython(fakePath(['wla-65816', 'wlalink']), { r65: true, pip: true });
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(window._warnings.length, 0);
+    });
 
-  it('stays quiet when everything is installed', async () => {
-    fakePath(['r65c', 'wla-65816', 'wlalink']);
-    await promptIfMissing(makeContext() as any);
-    assert.strictEqual(window._warnings.length, 0);
-  });
+    it('remembers Don\'t Ask Again', async () => {
+      const context = makeContext();
+      window._setWarningMessageChoice("Don't Ask Again");
+      await promptIfMissing(context as any);
+      assert.strictEqual(context.state[DISMISSED_KEY], true);
 
-  it('remembers Don\'t Ask Again', async () => {
-    const context = makeContext();
-    window._setWarningMessageChoice("Don't Ask Again");
-    await promptIfMissing(context as any);
-    assert.strictEqual(context.state[DISMISSED_KEY], true);
+      window._reset();
+      await promptIfMissing(context as any);
+      assert.strictEqual(window._warnings.length, 0);
+    });
 
-    window._reset();
-    await promptIfMissing(context as any);
-    assert.strictEqual(window._warnings.length, 0);
-  });
+    it('is off with xretrocode.checkToolchain false', async () => {
+      workspace._setConfig('xretrocode.checkToolchain', false);
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(window._warnings.length, 0);
+    });
 
-  it('is off with xretrocode.checkToolchain false', async () => {
-    workspace._setConfig('xretrocode.checkToolchain', false);
-    await promptIfMissing(makeContext() as any);
-    assert.strictEqual(window._warnings.length, 0);
-  });
+    it('opens the setup guide', async () => {
+      window._setWarningMessageChoice('Setup Guide');
+      await promptIfMissing(makeContext() as any);
+      assert.deepStrictEqual(env._opened.map(u => u.path), [SETUP_DOCS_URL]);
+    });
 
-  it('opens the setup guide', async () => {
-    window._setWarningMessageChoice('Setup Guide');
-    await promptIfMissing(makeContext() as any);
-    assert.deepStrictEqual(env._opened.map(u => u.path), [SETUP_DOCS_URL]);
-  });
+    it('pip installs R65 into the makefiles\' python, in a terminal task', async () => {
+      // Only R65 missing; this python has pip
+      const python = fakePython(fakePath(['wla-65816', 'wlalink']), { r65: false, pip: true });
+      window._setWarningMessageChoice('Install');
+      await promptIfMissing(makeContext() as any);
+      assert.strictEqual(tasks._executed.length, 1);
+      const execution = tasks._executed[0].execution;
+      assert.strictEqual(execution.command, python);
+      assert.deepStrictEqual(execution.args, PIP_INSTALL);
+    });
 
-  it('runs the R65 install in a terminal task', async () => {
-    // Only r65c missing, with pipx to install it
-    const dir = fakePath(['wla-65816', 'wlalink', 'pipx']);
-    window._setWarningMessageChoice('Install');
-    await promptIfMissing(makeContext() as any);
-    assert.strictEqual(tasks._executed.length, 1);
-    const execution = tasks._executed[0].execution;
-    assert.strictEqual(execution.command, path.join(dir, 'pipx'));
-    assert.deepStrictEqual(execution.args, ['install', 'git+https://github.com/BubbleZapGames/R65.git@release']);
-  });
+    it('reports a failed install', async () => {
+      fakePython(fakePath(['wla-65816', 'wlalink']), { r65: false, pip: true });
+      tasks._setExitCode(1);
+      window._setWarningMessageChoice('Install');
+      await promptIfMissing(makeContext() as any);
+      assert.ok(window._messages.some(m => m.includes('Installing R65 failed')));
+    });
 
-  it('reports a failed install', async () => {
-    fakePath(['wla-65816', 'wlalink', 'pipx']);
-    tasks._setExitCode(1);
-    window._setWarningMessageChoice('Install');
-    await promptIfMissing(makeContext() as any);
-    assert.ok(window._messages.some(m => m.includes('Installing R65 failed')));
-  });
+    it('says so when R65 installed but python -m r65.compiler.main still fails', async () => {
+      fakePython(fakePath(['wla-65816', 'wlalink']), { r65: false, pip: true });
+      window._setWarningMessageChoice('Install');
+      await promptIfMissing(makeContext() as any);
+      assert.ok(window._messages.some(m => m.includes('still doesn\'t run')), JSON.stringify(window._messages));
+    });
 
-  it('keeps installing after a failed step, and reports each failure', async () => {
-    fakePath(['brew', 'pipx']);
-    tasks._setExitCode(1);
-    window._setWarningMessageChoice('Install');
-    await promptIfMissing(makeContext() as any);
-    assert.deepStrictEqual(tasks._executed.map(t => t.name), ['install WLA-DX', 'install R65']);
-    assert.ok(window._messages.some(m => m.includes('Installing WLA-DX and R65 failed')));
-  });
+    it('keeps installing after a failed step, and reports each failure', async () => {
+      fakePython(fakePath(['brew']), { r65: false, pip: true });
+      tasks._setExitCode(1);
+      window._setWarningMessageChoice('Install');
+      await promptIfMissing(makeContext() as any);
+      assert.deepStrictEqual(tasks._executed.map(t => t.name), ['install WLA-DX', 'install R65']);
+      assert.ok(window._messages.some(m => m.includes('Installing WLA-DX and R65 failed')));
+    });
 
-  if (process.platform !== 'win32') {
-    it('sends a Python without pip to python.org', async () => {
-      // A python3 whose `-m pip --version` fails
-      const dir = fakePath(['wla-65816', 'wlalink']);
-      fs.writeFileSync(path.join(dir, 'python3'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    it('sends a python without pip to python.org', async () => {
+      fakePython(fakePath(['wla-65816', 'wlalink']), { r65: false, pip: false });
       window._setWarningMessageChoice('Install');
       window._setErrorMessageChoice('Install Python');
       await promptIfMissing(makeContext() as any);
@@ -225,16 +243,16 @@ describe('toolchain prompt', () => {
       assert.ok(window._messages.some(m => m.includes('needs Python 3.10+ with pip')));
       assert.deepStrictEqual(env._opened.map(u => u.path), [PYTHON_DOWNLOAD_URL]);
     });
-  }
 
-  it('checks on the first R65 document opened', async () => {
-    const context = makeContext();
-    registerToolchainCheck(context as any);
-    assert.strictEqual(window._warnings.length, 0);
-    workspace._openDocument({ languageId: 'c' });
-    workspace._openDocument({ languageId: 'r65' });
-    workspace._openDocument({ languageId: 'r65' });
-    await new Promise(resolve => setImmediate(resolve));
-    assert.strictEqual(window._warnings.length, 1);
+    it('checks on the first R65 document opened', async () => {
+      const context = makeContext();
+      registerToolchainCheck(context as any);
+      assert.strictEqual(window._warnings.length, 0);
+      workspace._openDocument({ languageId: 'c' });
+      workspace._openDocument({ languageId: 'r65' });
+      workspace._openDocument({ languageId: 'r65' });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.strictEqual(window._warnings.length, 1);
+    });
   });
-});
+}
