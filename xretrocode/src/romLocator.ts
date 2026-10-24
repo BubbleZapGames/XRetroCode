@@ -18,8 +18,9 @@ const EXCLUDE_GLOB = '**/{node_modules,.git}/**';
 export async function findRoms(): Promise<vscode.Uri[]> {
     const found = await vscode.workspace.findFiles(ROM_GLOB, EXCLUDE_GLOB);
     return [...found].sort((a, b) => {
-        const aBuild = /(^|\/)(build|bin|out|dist)\//.test(a.fsPath) ? 0 : 1;
-        const bBuild = /(^|\/)(build|bin|out|dist)\//.test(b.fsPath) ? 0 : 1;
+        // fsPath separates with backslashes on Windows
+        const aBuild = /(^|[\\/])(build|bin|out|dist)[\\/]/.test(a.fsPath) ? 0 : 1;
+        const bBuild = /(^|[\\/])(build|bin|out|dist)[\\/]/.test(b.fsPath) ? 0 : 1;
         if (aBuild !== bBuild) return aBuild - bBuild;
         return a.fsPath.localeCompare(b.fsPath);
     });
@@ -72,6 +73,6 @@ async function browseForRom(): Promise<string | undefined> {
 }
 
 function baseName(p: string): string {
-    const i = p.lastIndexOf('/');
+    const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
     return i >= 0 ? p.substring(i + 1) : p;
 }
