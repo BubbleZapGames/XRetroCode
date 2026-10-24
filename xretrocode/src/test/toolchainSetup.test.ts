@@ -106,8 +106,18 @@ describe('installPlan', () => {
   });
 
   it('passes over the Microsoft Store python placeholder', () => {
-    assert.ok(isWindowsStoreStub('C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe'));
-    assert.ok(!isWindowsStoreStub('C:\\fake\\python.exe'));
+    const fails = () => false;
+    assert.ok(isWindowsStoreStub('C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe', fails));
+    assert.ok(!isWindowsStoreStub('C:\\fake\\python.exe', fails));
+  });
+
+  // The Python Install Manager (python.org's Windows installer) puts its python there too
+  it('keeps a real python aliased into WindowsApps', () => {
+    const ran: string[][] = [];
+    const runs = (command: string, args: string[]) => { ran.push([command, ...args]); return true; };
+    const alias = 'C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe';
+    assert.ok(!isWindowsStoreStub(alias, runs));
+    assert.deepStrictEqual(ran, [[alias, '--version']]);
   });
 });
 

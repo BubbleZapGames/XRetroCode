@@ -44,7 +44,7 @@ export function checkToolchain(): ToolchainStatus {
 
 /** The `python` R65 makefiles run, skipping Windows' Microsoft Store placeholder. */
 function findPython(): string | undefined {
-    return findOnPath(PYTHON, process.env, process.platform, isWindowsStoreStub);
+    return findOnPath(PYTHON, process.env, process.platform, p => isWindowsStoreStub(p));
 }
 
 function runsOk(command: string, args: string[]): boolean {
@@ -83,9 +83,17 @@ export interface Installers {
     inVirtualEnv?: boolean;
 }
 
-/** Windows' python.exe placeholder, which opens the Microsoft Store */
-export function isWindowsStoreStub(p: string): boolean {
-    return /[\\/]WindowsApps[\\/]/i.test(p);
+/**
+ * Windows' python.exe placeholder, which opens the Microsoft Store. WindowsApps
+ * also holds real Pythons' aliases (the Python Install Manager's, the Store
+ * Python's), so a python there counts as the placeholder only when it won't
+ * run: the placeholder fails any arguments.
+ */
+export function isWindowsStoreStub(
+    p: string,
+    runs: (command: string, args: string[]) => boolean = runsOk
+): boolean {
+    return /[\\/]WindowsApps[\\/]/i.test(p) && !runs(p, ['--version']);
 }
 
 export function findInstallers(platform: NodeJS.Platform = process.platform): Installers {
