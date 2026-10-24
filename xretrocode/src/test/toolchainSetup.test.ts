@@ -60,7 +60,7 @@ describe('installPlan', () => {
   });
 
   it('links a WLA-DX download without brew', () => {
-    const plan = installPlan(NOTHING, { python: '/usr/bin/python', hasPip: true });
+    const plan = installPlan(NOTHING, { python: '/usr/bin/python', hasPip: true }, 'linux');
     assert.deepStrictEqual(plan.steps.map(s => s.label), ['R65']);
     assert.strictEqual(plan.needsManualWla, true);
   });

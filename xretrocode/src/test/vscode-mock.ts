@@ -64,7 +64,7 @@ export namespace workspace {
 
     export const fs = {
         readFile: (uri: any): Promise<Uint8Array> => {
-            const path = uri.fsPath || uri.path || uri.toString();
+            const path = (uri.fsPath || uri.path || uri.toString()).replace(/\\/g, '/');
             const content = _fileContents.get(path) || '';
             return Promise.resolve(new TextEncoder().encode(content));
         }
@@ -268,7 +268,8 @@ export class Uri {
     }
 
     static file(path: string): Uri {
-        return new Uri('file', path);
+        // Like the real Uri.file, accept Windows separators (path.join makes them there)
+        return new Uri('file', path.replace(/\\/g, '/'));
     }
 
     static parse(value: string): Uri {

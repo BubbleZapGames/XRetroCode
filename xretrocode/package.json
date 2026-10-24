@@ -338,7 +338,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "test": "mocha --require out/test/setup.js 'out/test/**/*.test.js'",
+    "test": "mocha --require out/test/setup.js \"out/test/**/*.test.js\"",
     "test:e2e": "npm run compile && node ./out/e2e/runTest.js"
   },
   "devDependencies": {

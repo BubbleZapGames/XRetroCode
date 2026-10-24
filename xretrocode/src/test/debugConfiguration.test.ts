@@ -1,4 +1,7 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { window, workspace, tasks, Uri } from './vscode-mock';
 import { ConfigurationProvider } from '../debugConfiguration';
 
@@ -76,6 +79,20 @@ describe('ConfigurationProvider', () => {
 
   describe('build before launch', () => {
     const FOLDER = { uri: Uri.file('/proj'), name: 'proj', index: 0 } as any;
+    // On Windows a missing make stops the launch with an install offer
+    // (covered in makeInstall.test), so give this machine a make
+    const savedPath = process.env.PATH;
+    let fakeMakeDir: string | undefined;
+    before(() => {
+      if (process.platform !== 'win32') return;
+      fakeMakeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xretrocode-make-'));
+      fs.writeFileSync(path.join(fakeMakeDir, 'make.exe'), '');
+      process.env.PATH = fakeMakeDir + path.delimiter + savedPath;
+    });
+    after(() => {
+      process.env.PATH = savedPath;
+      if (fakeMakeDir) fs.rmSync(fakeMakeDir, { recursive: true, force: true });
+    });
 
     beforeEach(() => {
       tasks._reset();

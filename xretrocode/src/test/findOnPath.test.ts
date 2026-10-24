@@ -21,11 +21,18 @@ describe('findOnPath', () => {
   it('finds a file, and passes over folders and links to nothing', () => {
     fs.writeFileSync(path.join(bin, 'tool'), '');
     fs.mkdirSync(path.join(bin, 'folder'));
-    fs.symlinkSync(path.join(root, 'missing'), path.join(bin, 'dangling'));
-    assert.strictEqual(findOnPath('tool', { PATH: bin }, 'linux'), path.join(bin, 'tool'));
-    assert.strictEqual(findOnPath('folder', { PATH: bin }, 'linux'), undefined);
-    assert.strictEqual(findOnPath('dangling', { PATH: bin }, 'linux'), undefined);
-    assert.strictEqual(findOnPath('absent', { PATH: bin }, 'linux'), undefined);
+    // Windows needs Developer Mode or admin for symlinks
+    let linked = true;
+    try {
+      fs.symlinkSync(path.join(root, 'missing'), path.join(bin, 'dangling'));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EPERM') throw e;
+      linked = false;
+    }
+    assert.strictEqual(findOnPath('tool', { PATH: bin }), path.join(bin, 'tool'));
+    assert.strictEqual(findOnPath('folder', { PATH: bin }), undefined);
+    if (linked) assert.strictEqual(findOnPath('dangling', { PATH: bin }), undefined);
+    assert.strictEqual(findOnPath('absent', { PATH: bin }), undefined);
   });
 
   it('finds a link stat can\'t follow, as with Windows\' WindowsApps\\winget.exe', function () {
@@ -44,7 +51,8 @@ describe('findOnPath', () => {
     fs.mkdirSync(later);
     fs.writeFileSync(path.join(bin, 'python'), '');
     fs.writeFileSync(path.join(later, 'python'), '');
-    const env = { PATH: [bin, later].join(':') };
-    assert.strictEqual(findOnPath('python', env, 'linux', p => p.startsWith(bin)), path.join(later, 'python'));
+    // path.delimiter: a ':' list would split C:\ drive letters on Windows
+    const env = { PATH: [bin, later].join(path.delimiter) };
+    assert.strictEqual(findOnPath('python', env, process.platform, p => p.startsWith(bin)), path.join(later, 'python'));
   });
 });
