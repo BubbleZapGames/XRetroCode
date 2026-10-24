@@ -16,6 +16,28 @@ function wingetLinks(env: NodeJS.ProcessEnv): string | undefined {
     return env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Links') : undefined;
 }
 
+/**
+ * Where winget unpacks ezwinports.make, e.g. Packages\ezwinports.make_<source>\bin\make.exe.
+ * Without Developer Mode winget can't link it into Links, and puts this bin
+ * folder on the user's PATH instead.
+ */
+function wingetPackageMake(env: NodeJS.ProcessEnv): string | undefined {
+    if(!env.LOCALAPPDATA) return undefined;
+    const packages = path.join(env.LOCALAPPDATA, 'Microsoft', 'WinGet', 'Packages');
+    let dirs: string[];
+    try {
+        dirs = fs.readdirSync(packages);
+    } catch {
+        return undefined;
+    }
+    for(const dir of dirs) {
+        if(!dir.startsWith(WINGET_MAKE_ID + '_')) continue;
+        const make = path.join(packages, dir, 'bin', 'make.exe');
+        if(fs.existsSync(make)) return make;
+    }
+    return undefined;
+}
+
 /** make on PATH, else (Windows) the one winget installed; undefined when there is none. */
 export function findMake(
     env: NodeJS.ProcessEnv = process.env,
@@ -26,8 +48,11 @@ export function findMake(
         return onPath;
     }
     const links = wingetLinks(env);
-    const installed = links && path.join(links, 'make.exe');
-    return installed && fs.existsSync(installed) ? installed : undefined;
+    const linked = links && path.join(links, 'make.exe');
+    if(linked && fs.existsSync(linked)) {
+        return linked;
+    }
+    return wingetPackageMake(env);
 }
 
 /** What the ROM build runs: `make`, or winget's make.exe while VS Code's PATH can't see it. */

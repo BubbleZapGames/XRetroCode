@@ -45,6 +45,18 @@ describe('findMake and makeCommand', () => {
     assert.strictEqual(findMake(win.vars, 'win32'), installed);
     assert.strictEqual(makeCommand(win.vars, 'win32'), installed);
   });
+
+  // Without Developer Mode winget can't make the Links symlink, and puts the
+  // package's own bin folder on the user's PATH instead
+  it('finds the make winget left in its package folder', () => {
+    const win = windowsEnv();
+    const bin = path.join(win.vars.LOCALAPPDATA!, 'Microsoft', 'WinGet', 'Packages',
+      `${WINGET_MAKE_ID}_Microsoft.Winget.Source_8wekyb3d8bbwe`, 'bin');
+    fs.mkdirSync(bin, { recursive: true });
+    fs.writeFileSync(path.join(bin, 'make.exe'), '');
+    assert.strictEqual(findMake(win.vars, 'win32'), path.join(bin, 'make.exe'));
+    assert.strictEqual(makeCommand(win.vars, 'win32'), path.join(bin, 'make.exe'));
+  });
 });
 
 describe('ensureMake', () => {
