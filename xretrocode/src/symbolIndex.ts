@@ -494,11 +494,15 @@ export class R65SymbolIndex implements vscode.Disposable {
   }
 
   async indexFile(uri: vscode.Uri): Promise<void> {
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    this.indexText(uri, new TextDecoder().decode(bytes));
+  }
+
+  /** Index `text` as the contents of `uri`, e.g. an editor's unsaved buffer. */
+  indexText(uri: vscode.Uri, text: string): void {
     // Remove old symbols for this file first
     this.removeFile(uri);
 
-    const bytes = await vscode.workspace.fs.readFile(uri);
-    const text = new TextDecoder().decode(bytes);
     const syms = parseSymbolsFromText(text, uri);
 
     this.fileSymbols.set(uri.toString(), syms);
@@ -587,6 +591,27 @@ export class R65SymbolIndex implements vscode.Disposable {
     this.disposables.push(watcher.onDidCreate((uri: vscode.Uri) => this.indexFile(uri)));
     this.disposables.push(watcher.onDidChange((uri: vscode.Uri) => this.indexFile(uri)));
     this.disposables.push(watcher.onDidDelete((uri: vscode.Uri) => this.removeFile(uri)));
+
+    // Edits show up before they're saved, so a rename right after another sees it
+    const pending = new Map<string, ReturnType<typeof setTimeout>>();
+    const isR65 = (doc: vscode.TextDocument) => doc.languageId === 'r65' && doc.uri.scheme === 'file';
+    this.disposables.push(vscode.workspace.onDidChangeTextDocument(e => {
+      if (!isR65(e.document)) return;
+      const key = e.document.uri.toString();
+      clearTimeout(pending.get(key));
+      pending.set(key, setTimeout(() => {
+        pending.delete(key);
+        this.indexText(e.document.uri, e.document.getText());
+      }, 300));
+    }));
+    // Closed without saving: back to what's on disk
+    this.disposables.push(vscode.workspace.onDidCloseTextDocument(doc => {
+      if (!isR65(doc)) return;
+      clearTimeout(pending.get(doc.uri.toString()));
+      pending.delete(doc.uri.toString());
+      this.indexFile(doc.uri).catch(() => this.removeFile(doc.uri));
+    }));
+    this.disposables.push({ dispose: () => pending.forEach(t => clearTimeout(t)) });
     return vscode.Disposable.from(...this.disposables);
   }
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { R65Symbol, R65SymbolIndex, R65SymbolKind } from './symbolIndex';
 import { LineSource, R65Resolver } from './typeResolver';
-import { maskCode } from './referenceProvider';
+import { maskCode } from './sourceText';
 import { nearestCopy } from './definitionProvider';
 
 export const GO_TO_MACRO_COMMAND = 'xretrocode.goToMacroDefinition';

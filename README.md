@@ -46,6 +46,9 @@ SMS/Game Gear and WonderSwan. SNES with R65 is the most complete path.
 - Syntax highlighting
 - Go to Definition, Find All References, hover, completion, the Outline view and
   workspace symbol search (Ctrl+T)
+- Rename Symbol (F2) across the project, including trait methods in every impl.
+  Matches it can't be sure of, and labels in assembly (`.asm`/`.s`/`.inc` and
+  `asm!` strings), wait for your confirmation in the Refactor Preview
 - `r65c` build and check tasks with a problem matcher
 - Toolchain setup: opening an `.r65` file without R65 or WLA-DX offers to
   install them (below)

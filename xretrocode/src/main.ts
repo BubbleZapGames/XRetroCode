@@ -7,6 +7,7 @@ import { R65DocumentSymbolProvider } from './documentSymbolProvider';
 import { R65HoverProvider } from './hoverProvider';
 import { R65CompletionProvider } from './completionProvider';
 import { R65ReferenceProvider } from './referenceProvider';
+import { R65RenameProvider } from './renameProvider';
 import { R65WorkspaceSymbolProvider } from './workspaceSymbolProvider';
 import { MacroDefinitionAid } from './macroDefinitionAid';
 import { DebugAdapterDescriptorFactory, setExtensionPath } from './debugAdapter';
@@ -28,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // R65 language: tasks, symbol index, go-to-definition, outline, hover,
-// completion, references, workspace symbols, toolchain setup
+// completion, references, rename, workspace symbols, toolchain setup
 function activateLanguage(context: vscode.ExtensionContext) {
     taskProvider = vscode.tasks.registerTaskProvider('r65', new R65TaskProvider());
     context.subscriptions.push(taskProvider);
@@ -54,6 +55,9 @@ function activateLanguage(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(
         vscode.languages.registerReferenceProvider(selector, new R65ReferenceProvider(symbolIndex))
+    );
+    context.subscriptions.push(
+        vscode.languages.registerRenameProvider(selector, new R65RenameProvider(symbolIndex))
     );
     context.subscriptions.push(
         vscode.languages.registerWorkspaceSymbolProvider(new R65WorkspaceSymbolProvider(symbolIndex))

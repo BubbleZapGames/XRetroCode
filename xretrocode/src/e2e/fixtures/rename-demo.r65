@@ -1,0 +1,18 @@
+// Rename (F2) fixture. Every name here is unique to this file, so other suites
+// never see it.
+extern fn rd_play(id: u8);
+
+struct RdPoint { x: u8, y: u8 }
+
+impl RdPoint {
+    fn rd_shift(far *self) {
+        self.x = self.x + 1;
+        asm!("JSL rd_play");
+    }
+}
+
+fn rd_main(p: *RdPoint) {
+    let rd_count = RdPoint { x: 1, y: 2 };
+    p.rd_shift();
+    rd_play(rd_count.y);
+}

@@ -33,6 +33,17 @@ export namespace workspace {
         for(const handler of [..._openHandlers]) handler(document);
     }
 
+    let _changeHandlers: ((event: any) => void)[] = [];
+    export function onDidChangeTextDocument(handler: (event: any) => void): any {
+        _changeHandlers.push(handler);
+        return { dispose: () => { _changeHandlers = _changeHandlers.filter(h => h !== handler); } };
+    }
+    let _closeHandlers: ((document: any) => void)[] = [];
+    export function onDidCloseTextDocument(handler: (document: any) => void): any {
+        _closeHandlers.push(handler);
+        return { dispose: () => { _closeHandlers = _closeHandlers.filter(h => h !== handler); } };
+    }
+
     export function findFiles(include: string, _exclude?: string): Promise<Uri[]> {
         // Honour the extensions named by the glob: **/*.r65 or **/*.{sfc,smc,...}
         const braces = include.match(/\{([^}]*)\}/);
@@ -73,7 +84,7 @@ export namespace workspace {
     export function _setConfig(key: string, value: any) { _config[key] = value; }
     export function _setFileContent(path: string, content: string) { _fileContents.set(path, content); }
     export function _setWorkspaceFolders(folders: any[] | undefined) { workspaceFolders = folders; }
-    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; textDocuments.length = 0; _openHandlers = []; }
+    export function _reset() { _config = {}; _fileContents.clear(); workspaceFolders = undefined; _updates.length = 0; textDocuments.length = 0; _openHandlers = []; _changeHandlers = []; _closeHandlers = []; }
 }
 
 export namespace tasks {
@@ -126,6 +137,9 @@ export namespace languages {
         return { dispose: () => {} };
     }
     export function registerReferenceProvider(_selector: any, _provider: any): any {
+        return { dispose: () => {} };
+    }
+    export function registerRenameProvider(_selector: any, _provider: any): any {
         return { dispose: () => {} };
     }
     export function registerWorkspaceSymbolProvider(_provider: any): any {
@@ -303,6 +317,17 @@ export class Range {
 
 export class Location {
     constructor(public uri: Uri, public range: Range) {}
+}
+
+/** Records `replace` edits, with their metadata, in the order made. */
+export class WorkspaceEdit {
+    readonly _edits: { uri: Uri; range: Range; newText: string; metadata?: { needsConfirmation: boolean; label: string } }[] = [];
+    replace(uri: Uri, range: Range, newText: string, metadata?: { needsConfirmation: boolean; label: string }): void {
+        this._edits.push({ uri, range, newText, metadata });
+    }
+    get size(): number {
+        return new Set(this._edits.map(e => e.uri.toString())).size;
+    }
 }
 
 export class MarkdownString {

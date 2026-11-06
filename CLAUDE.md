@@ -85,7 +85,18 @@ xretrocode/
     documentSymbolProvider.ts — Outline view
     hoverProvider.ts          — Hover: signature, owner, doc comment
     completionProvider.ts     — Completion after `.`, `Type::` and bare names
-    referenceProvider.ts      — Find All References
+    sourceText.ts             — Comment/string/char masking, brace matching, and each fn's
+                                scoped local bindings (params, let, for, if let, match arms)
+    references.ts             — Shared reference finder: what a name means, and every hit,
+                                each "sure" or "likely" (an unresolved `.` receiver)
+    referenceProvider.ts      — Find All References (on references.ts)
+    renameProvider.ts         — Rename Symbol (F2): trait-method families, project-scoped
+                                (nearest r65.toml/makefile), never .r65/deps/; likely hits
+                                and assembly hits need confirmation (Refactor Preview)
+    asmReferences.ts          — Labels a symbol reaches WLA-DX as (`name`, `Type__method`,
+                                `Enum__Variant`), found in .asm/.s/.inc and `asm!` strings;
+                                skips r65c's generated output
+    r65Keywords.ts            — Reserved words (from the compiler grammar's IDENT rule)
     workspaceSymbolProvider.ts — Ctrl+T symbol search
     macroDefinitionAid.ts     — While debugging: "Go to Macro Definition" for the
                                 macros on the stopped line (the debugger steps over them)
@@ -114,7 +125,8 @@ xretrocode/
                                 inspection, launch path, lifecycle, macro definitions, .sym
                                 labels, the disassembly view; hello_c (cc65 C, NES) for C
                                 breakpoints and stepping; hello_asm (ca65, NES) for
-                                assembly. e2e/fixtures/ is copied into its workspace
+                                assembly; rename-demo.r65 (fixture) for Rename Symbol.
+                                e2e/fixtures/ is copied into its workspace
   .vscode/
     launch.json               — For developing/debugging the extension itself
 ```

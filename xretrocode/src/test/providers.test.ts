@@ -3,7 +3,8 @@ import { Uri, Position, CompletionItemKind, SymbolKind, workspace } from './vsco
 import { R65SymbolIndex } from '../symbolIndex';
 import { R65HoverProvider } from '../hoverProvider';
 import { R65CompletionProvider } from '../completionProvider';
-import { R65ReferenceProvider, maskCode } from '../referenceProvider';
+import { R65ReferenceProvider } from '../referenceProvider';
+import { maskCode } from '../sourceText';
 import { R65WorkspaceSymbolProvider } from '../workspaceSymbolProvider';
 import { createMockDocument, noCancel, positionOf } from './mockDocument';
 
