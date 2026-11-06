@@ -3,6 +3,7 @@ import { Uri, Position, SymbolKind, workspace } from './vscode-mock';
 import {
   baseTypeName, declTypeText, elementTypeText, parseFnHeader, ValueShape, valueShape, parseSymbolsFromText, R65SymbolIndex, R65SymbolKind,
 } from '../symbolIndex';
+import { wordAt } from '../typeResolver';
 import { R65DefinitionProvider } from '../definitionProvider';
 import { R65DocumentSymbolProvider } from '../documentSymbolProvider';
 import { createMockDocument, noCancel, positionOf } from './mockDocument';
@@ -332,5 +333,24 @@ describe('Candidate selection', () => {
     });
     const caller = 'fn f(x: *Mystery) {\n    x.init();';
     assert.ok(Array.isArray(definitionLine(index, caller, 'init')));
+  });
+});
+
+describe('wordAt', () => {
+  const src = { lineAt: () => ({ text: 'p.update(x);' }), lineCount: 1 };
+  const word = (character: number) => wordAt(src, 0, character)?.word;
+
+  it('should take the word under the cursor, preferring it to one ending there', () => {
+    assert.strictEqual(word(0), 'p');
+    assert.strictEqual(word(2), 'update');
+  });
+
+  it('should take the word ending at the cursor, as a double-click leaves it', () => {
+    assert.strictEqual(word(8), 'update');
+    assert.strictEqual(word(1), 'p');
+  });
+
+  it('should find nothing away from any word', () => {
+    assert.strictEqual(word(11), undefined);
   });
 });

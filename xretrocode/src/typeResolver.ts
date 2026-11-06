@@ -57,17 +57,22 @@ const TRAIT_RE = /\btrait\s+([A-Z][a-zA-Z0-9_]*)[^{]*\{/;
 
 const FN_LINE_RE = /\bfn\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(/;
 
-/** The identifier under `character` on `line`, if any. */
+/**
+ * The identifier under `character` on `line`, else the one ending there — as
+ * VS Code's own word rule has it. A double-clicked word leaves the cursor at
+ * its end, and context-menu commands (Rename, Go to Definition) send that.
+ */
 export function wordAt(src: LineSource, line: number, character: number): Word | undefined {
   const text = src.lineAt(line).text;
   const re = new RegExp(IDENT, 'g');
   let m: RegExpExecArray | null;
+  let endingHere: Word | undefined;
   while ((m = re.exec(text)) !== null) {
-    if (m.index <= character && m.index + m[0].length > character) {
-      return { word: m[0], line, start: m.index, end: m.index + m[0].length };
-    }
+    const word = { word: m[0], line, start: m.index, end: m.index + m[0].length };
+    if (word.start <= character && word.end > character) return word;
+    if (word.end === character) endingHere = word;
   }
-  return undefined;
+  return endingHere;
 }
 
 export class R65Resolver {
