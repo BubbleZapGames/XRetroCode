@@ -3,7 +3,8 @@
 Source-level debugging of retro console games in VS Code, plus language support
 for the [R65](https://github.com/BubbleZapGames/R65) compiler.
 
-XRetroCode is a VS Code extension (`xretrocode/`) that drives
+XRetroCode is a VS Code extension (`xretrocode/`,
+[on the Marketplace](https://marketplace.visualstudio.com/items?itemName=BubbleZapGamesLLC.xretrocode)) that drives
 [Mesen-GDB](https://github.com/BubbleZapGames/Mesen-GDB) over the Debug Adapter
 Protocol. Mesen-GDB runs the ROM on Mesen2's emulation core and maps addresses
 back to source lines through the build's symbols (a cc65-format `.dbg`, or a
@@ -94,7 +95,10 @@ lets you browse for it. It remembers the binary you pick.
 
 ### 2. Install the extension
 
-Package it as a `.vsix` and install that:
+Install [XRetroCode from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=BubbleZapGamesLLC.xretrocode),
+or search for "XRetroCode" in VS Code's Extensions view.
+
+To build it from source instead, package it as a `.vsix` and install that:
 
 ```bash
 cd xretrocode
